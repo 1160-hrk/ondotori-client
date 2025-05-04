@@ -15,9 +15,7 @@ def example_with_config():
     """config.json を使った初期化例"""
     # 設定ファイルパスを指定
     client = OndotoriClient(
-        config="configs/config.json",
-        device_type="rtr500",
-        verbose=True
+        config="configs/config.json", device_type="rtr500", verbose=True
     )
     sensor_key = "CrZnS1"
 
@@ -43,7 +41,7 @@ def example_direct_args():
         login_pass=cfg["login_pass"],
         base_serial=cfg["bases"]["Ce302"]["serial"],
         device_type="rtr500",
-        verbose=True
+        verbose=True,
     )
     # リモートシリアル直接指定
     serial = "52BCA065"

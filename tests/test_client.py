@@ -22,9 +22,7 @@ import requests
 import pandas as pd
 
 
-def parse_current(
-        json_current: Dict[str, Any]
-        ) -> Tuple[datetime, float, float]:
+def parse_current(json_current: Dict[str, Any]) -> Tuple[datetime, float, float]:
     """最新の温湿度データから時刻・温度・湿度を抽出する"""
     devices = json_current.get("devices", [])
     if not devices:
@@ -37,9 +35,7 @@ def parse_current(
     return ts, temp, hum
 
 
-def parse_data(
-        json_data: Dict[str, Any]
-        ) -> Tuple[list, list, list]:
+def parse_data(json_data: Dict[str, Any]) -> Tuple[list, list, list]:
     """データログ JSON から時刻リスト, 温度リスト, 湿度リストを生成する"""
     rows = json_data.get("data", [])
     times = [datetime.fromtimestamp(int(r["unixtime"])) for r in rows]
@@ -62,24 +58,13 @@ class OndotoriClient:
         session: カスタム requests.Session
         logger: カスタム logging.Logger
     """
-    _URL_CURRENT = (
-        "https://api.webstorage.jp/v1/devices/current"
-    )
-    _URL_DATA_DEFAULT = (
-        "https://api.webstorage.jp/v1/devices/data"
-    )
-    _URL_DATA_RTR500 = (
-        "https://api.webstorage.jp/v1/devices/data-rtr500"
-    )
-    _URL_LATEST_DEFAULT = (
-        "https://api.webstorage.jp/v1/devices/latest-data"
-    )
-    _URL_LATEST_RTR500 = (
-        "https://api.webstorage.jp/v1/devices/latest-data-rtr500"
-    )
-    _URL_ALERT = (
-        "https://api.webstorage.jp/v1/devices/alert"
-    )
+
+    _URL_CURRENT = "https://api.webstorage.jp/v1/devices/current"
+    _URL_DATA_DEFAULT = "https://api.webstorage.jp/v1/devices/data"
+    _URL_DATA_RTR500 = "https://api.webstorage.jp/v1/devices/data-rtr500"
+    _URL_LATEST_DEFAULT = "https://api.webstorage.jp/v1/devices/latest-data"
+    _URL_LATEST_RTR500 = "https://api.webstorage.jp/v1/devices/latest-data-rtr500"
+    _URL_ALERT = "https://api.webstorage.jp/v1/devices/alert"
 
     def __init__(
         self,
@@ -148,30 +133,19 @@ class OndotoriClient:
         base_name = info.get("base", self._default_base)
         base_info = self._bases.get(base_name)
         if not base_info:
-            raise KeyError(
-                f"Base '{base_name}' が設定にありません"
-            )
+            raise KeyError(f"Base '{base_name}' が設定にありません")
         return base_info["serial"]
 
-    def _to_timestamp(
-        self,
-        dt: Union[datetime, int, str]
-    ) -> int:
+    def _to_timestamp(self, dt: Union[datetime, int, str]) -> int:
         if isinstance(dt, int):
             return dt
         if isinstance(dt, datetime):
             return int(dt.timestamp())
         return int(datetime.fromisoformat(dt).timestamp())
 
-    def _post(
-        self,
-        url: str,
-        payload: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _post(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         for attempt in range(self.retries):
-            self.logger.debug(
-                f"POST {url} attempt={attempt+1} payload={payload}"
-            )
+            self.logger.debug(f"POST {url} attempt={attempt+1} payload={payload}")
             resp = self.session.post(
                 url,
                 headers=self.headers,
@@ -182,17 +156,13 @@ class OndotoriClient:
                 resp.raise_for_status()
                 return resp.json()
             except Exception as e:
-                self.logger.warning(
-                    f"Error {e} on attempt {attempt+1}"
-                )
+                self.logger.warning(f"Error {e} on attempt {attempt+1}")
                 if attempt == self.retries - 1:
                     raise
 
     def get_current(self, remote_key: str) -> Dict[str, Any]:
         """現在値取得"""
-        serial = self._remote_map.get(remote_key, {}).get(
-            "serial", remote_key
-        )
+        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": [serial]}
         return self._post(self._URL_CURRENT, payload)
 
@@ -211,16 +181,10 @@ class OndotoriClient:
             dt_to_unix = now
             dt_from_unix = now - hours * 3600
         else:
-            dt_from_unix = (
-                self._to_timestamp(dt_from) if dt_from else None
-            )
-            dt_to_unix = (
-                self._to_timestamp(dt_to) if dt_to else None
-            )
+            dt_from_unix = self._to_timestamp(dt_from) if dt_from else None
+            dt_to_unix = self._to_timestamp(dt_to) if dt_to else None
 
-        serial = self._remote_map.get(remote_key, {}).get(
-            "serial", remote_key
-        )
+        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
 
         if self.device_type == "rtr500":
@@ -239,16 +203,12 @@ class OndotoriClient:
         result = self._post(url, payload)
         if as_df:
             times, temps, hums = parse_data(result)
-            return pd.DataFrame(
-                {"timestamp": times, "temp_C": temps, "hum_%": hums}
-            )
+            return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
         return result
 
     def get_latest_data(self, remote_key: str) -> Dict[str, Any]:
         """最新データ取得"""
-        serial = self._remote_map.get(remote_key, {}).get(
-            "serial", remote_key
-        )
+        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
         if self.device_type == "rtr500":
             url = self._URL_LATEST_RTR500
@@ -259,9 +219,7 @@ class OndotoriClient:
 
     def get_alerts(self, remote_key: str) -> Dict[str, Any]:
         """アラートログ取得"""
-        serial = self._remote_map.get(remote_key, {}).get(
-            "serial", remote_key
-        )
+        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
         if self.device_type == "rtr500":
             payload["base-serial"] = self._resolve_base(remote_key)
