@@ -22,7 +22,9 @@ import requests
 import pandas as pd
 
 
-def parse_current(json_current: Dict[str, Any]) -> Tuple[datetime, float, float]:
+def parse_current(
+    json_current: Dict[str, Any]
+    ) -> Tuple[datetime, float, float]:
     """
     最新の温湿度データから時刻・温度・湿度を抽出する
     """
@@ -37,7 +39,9 @@ def parse_current(json_current: Dict[str, Any]) -> Tuple[datetime, float, float]
     return ts, temp, hum
 
 
-def parse_data(json_data: Dict[str, Any]) -> Tuple[list, list, list]:
+def parse_data(
+    json_data: Dict[str, Any]
+    ) -> Tuple[list, list, list]:
     """
     データログ JSON から時刻リスト, 温度リスト, 湿度リストを生成する
     """
@@ -63,12 +67,24 @@ class OndotoriClient:
         logger: カスタム logging.Logger
     """
     # エンドポイント定義
-    _URL_CURRENT = "https://api.webstorage.jp/v1/devices/current"
-    _URL_DATA_DEFAULT = "https://api.webstorage.jp/v1/devices/data"
-    _URL_DATA_RTR500 = "https://api.webstorage.jp/v1/devices/data-rtr500"
-    _URL_LATEST_DEFAULT = "https://api.webstorage.jp/v1/devices/latest-data"
-    _URL_LATEST_RTR500 = "https://api.webstorage.jp/v1/devices/latest-data-rtr500"
-    _URL_ALERT = "https://api.webstorage.jp/v1/devices/alert"
+    _URL_CURRENT = (
+         "https://api.webstorage.jp/v1/devices/current"
+         )
+    _URL_DATA_DEFAULT = (
+         "https://api.webstorage.jp/v1/devices/data"
+         )
+    _URL_DATA_RTR500 = (
+         "https://api.webstorage.jp/v1/devices/data-rtr500"
+         )
+    _URL_LATEST_DEFAULT = (
+         "https://api.webstorage.jp/v1/devices/latest-data"
+         )
+    _URL_LATEST_RTR500 = (
+         "https://api.webstorage.jp/v1/devices/latest-data-rtr500"
+         )
+    _URL_ALERT = (
+         "https://api.webstorage.jp/v1/devices/alert"
+         )
 
     def __init__(
         self,
@@ -105,7 +121,9 @@ class OndotoriClient:
             self._remote_map = cfg.get("remote_map", {})
         else:
             if not all([api_key, login_id, login_pass, base_serial]):
-                raise ValueError("api_key, login_id, login_pass, base_serial が必要です")
+                raise ValueError(
+                    "api_key, login_id, login_pass, base_serial が必要です"
+                    )
             self._auth = {
                 "api-key": api_key,
                 "login-id": login_id,
@@ -130,7 +148,9 @@ class OndotoriClient:
         # ロガー初期化
         self.logger = logger or logging.getLogger(__name__)
         level = logging.DEBUG if verbose else logging.INFO
-        logging.basicConfig(level=level, format="%(asctime)s %(levelname)s: %(message)s")
+        logging.basicConfig(
+            level=level, format="%(asctime)s %(levelname)s: %(message)s"
+            )
 
     def _resolve_base(self, remote_key: str) -> str:
         # リモートキーからベースシリアルを取得
@@ -150,8 +170,12 @@ class OndotoriClient:
 
     def _post(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         for attempt in range(self.retries):
-            self.logger.debug(f"POST {url} attempt={attempt+1} payload={payload}")
-            resp = self.session.post(url, headers=self.headers, json=payload, timeout=self.timeout)
+            self.logger.debug(
+                f"POST {url} attempt={attempt+1} payload={payload}"
+                )
+            resp = self.session.post(
+                url, headers=self.headers, json=payload, timeout=self.timeout
+                )
             try:
                 resp.raise_for_status()
                 return resp.json()
@@ -204,7 +228,9 @@ class OndotoriClient:
         result = self._post(url, payload)
         if as_df:
             times, temps, hums = parse_data(result)
-            return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
+            return pd.DataFrame(
+                {"timestamp": times, "temp_C": temps, "hum_%": hums}
+                )
         return result
 
     def get_latest_data(self, remote_key: str) -> Dict[str, Any]:
