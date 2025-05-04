@@ -1,0 +1,12 @@
+# .flake8
+[flake8]
+# Black と合わせて 88 文字まで許容
+max-line-length = 88
+# Black 推奨スタイルと衝突しやすいものを無視
+ignore = E203, W503
+exclude = 
+    .git,
+    __pycache__,
+    build,
+    dist,
+    .venv
