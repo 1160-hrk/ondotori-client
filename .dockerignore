@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.git/
+tests/
+docs/
+configs/config.example.json
+configs/config.json
+.devcontainer/

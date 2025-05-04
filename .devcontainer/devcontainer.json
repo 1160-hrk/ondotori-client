@@ -1,0 +1,26 @@
+{
+  "name": "ondotori-client (dev)",
+  "build": {
+    "context": "..",
+    "dockerfile": "../Dockerfile.dev"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.pythonPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black"
+      }
+    }
+  },
+  // 開発用依存がすでにイメージに入っているので不要ですが、
+  // 追加で postCreateCommand を走らせたい場合は requirements-dev.txt だけ。
+  "postCreateCommand": "pip install --no-cache-dir -r requirements-dev.txt",
+  "remoteUser": "root"
+}

@@ -1,0 +1,27 @@
+# ───────────── builder stage ─────────────
+FROM python:3.12-slim AS builder
+WORKDIR /wheels
+
+# C コンパイラだけ入れて wheel を作成
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir=. -r requirements.txt
+
+# ───────────── final stage ─────────────
+FROM python:3.12-slim
+WORKDIR /app
+
+# wheels だけコピーしてインストール（ビルド不要）
+COPY --from=builder /wheels/*.whl /wheels/
+RUN pip install --no-cache-dir /wheels/*.whl
+
+# アプリ本体だけコピー
+COPY src/ ./src/
+COPY examples/ ./examples/
+
+# デフォルト実行
+ENTRYPOINT ["python"]
+CMD ["examples/basic_usage.py"]
