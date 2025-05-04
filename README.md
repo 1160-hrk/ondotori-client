@@ -12,8 +12,6 @@ Ondotori WebStorage API（RTR500B／その他機種）を Python から簡単に
 
 ```bash
 pip install ondotori-client
-# 開発用依存も入れるなら
-pip install .[dev]
 ````
 
 ## Quickstart
