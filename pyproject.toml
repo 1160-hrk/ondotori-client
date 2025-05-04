@@ -18,3 +18,11 @@ dev = [
   "black>=23.1",
   "isort>=5.10"
 ]
+
+# pyproject.toml の末尾などに追加
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+  "E203",  # Black と衝突しやすいスペース周り
+  "W503"   # Black 推奨の改行前演算子スタイル
+]
