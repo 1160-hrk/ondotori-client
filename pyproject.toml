@@ -2,15 +2,19 @@
 name = "ondotori-client"
 version = "0.1.0"
 description = "Ondotori WebStorage API クライアント"
-authors = [{name="Hiroki Tsusaka", email="tsusaka4research@gmail.com"}]
 readme = "README.md"
-license = {text = "MIT"}
+authors = [
+  { name = "Hiroki Tsusaka", email = "tsusaka4research@gmail.com" }
+]
+license = { text = "MIT" }
 
-[tool.poetry.dependencies]
-python = "^3.8"
-requests = "^2.28"
-pandas = "^1.5"
+# 本番依存はここに
+dependencies = [
+  "requests>=2.28,<3.0",
+  "pandas>=1.5,<2.0"
+]
 
+# dev extras
 [project.optional-dependencies]
 dev = [
   "pytest>=7.0",
@@ -19,10 +23,6 @@ dev = [
   "isort>=5.10"
 ]
 
-# pyproject.toml の末尾などに追加
-[tool.flake8]
-max-line-length = 88
-extend-ignore = [
-  "E203",  # Black と衝突しやすいスペース周り
-  "W503"   # Black 推奨の改行前演算子スタイル
-]
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
