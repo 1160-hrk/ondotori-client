@@ -15,7 +15,9 @@ Ondotori WebStorage API クライアント実装
 """
 import json
 import logging
-from typing import Optional, Dict, Any, Tuple, Union
+from typing import Optional, Dict, Any, Tuple, Union, TYPE_CHECKING
+if TYPE_CHECKING:
+    import pandas as pd
 from datetime import datetime
 
 import requests
@@ -180,7 +182,7 @@ class OndotoriClient:
         count: Optional[int] = None,
         hours: Optional[int] = None,
         as_df: bool = False,
-    ) -> Union[Dict[str, Any], "pd.DataFrame"]:
+    ) -> Union[Dict[str, Any], pd.DataFrame]:
         """期間/件数指定データ取得"""
         # 時間レンジ計算
         if hours is not None:
