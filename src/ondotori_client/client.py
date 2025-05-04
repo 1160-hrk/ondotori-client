@@ -19,7 +19,6 @@ from typing import Optional, Dict, Any, Tuple, Union
 from datetime import datetime
 
 import requests
-import pandas as pd
 
 
 def parse_current(json_current: Dict[str, Any]) -> Tuple[datetime, float, float]:
@@ -181,7 +180,7 @@ class OndotoriClient:
         count: Optional[int] = None,
         hours: Optional[int] = None,
         as_df: bool = False,
-    ) -> Union[Dict[str, Any], pd.DataFrame]:
+    ) -> Union[Dict[str, Any], "pd.DataFrame"]:
         """期間/件数指定データ取得"""
         # 時間レンジ計算
         if hours is not None:
@@ -210,6 +209,14 @@ class OndotoriClient:
 
         result = self._post(url, payload)
         if as_df:
+            # DataFrame 出力時にのみインポート
+            try:
+                import pandas as pd
+            except ImportError:
+                raise ImportError(
+                    "pandas がインストールされていないため DataFrame 出力できません。"
+                    " `pip install ondotori-client[dataframe]` をお試しください。"
+                )
             times, temps, hums = parse_data(result)
             return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
         return result

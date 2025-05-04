@@ -1,3 +1,22 @@
+Metadata-Version: 2.4
+Name: ondotori-client
+Version: 0.1.1
+Summary: Ondotori WebStorage API クライアント
+Author-email: Hiroki Tsusaka <tsusaka4research@gmail.com>
+License: MIT
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: requests<3.0,>=2.28
+Requires-Dist: numpy<2.0,>=1.23
+Requires-Dist: pandas<2.0,>=1.5
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: flake8>=5.0; extra == "dev"
+Requires-Dist: black>=23.1; extra == "dev"
+Requires-Dist: isort>=5.10; extra == "dev"
+Requires-Dist: numpy<2.0,>=1.23; extra == "dev"
+Dynamic: license-file
+
 # ondotori-client
 
 [![CI](https://github.com/1160-hrk/ondotori-client/actions/workflows/ci.yml/badge.svg)](https://github.com/1160-hrk/ondotori-client/actions)
@@ -18,11 +37,6 @@ pip install .[dev]
 
 ## Quickstart
 
-### DataFrame 出力を使う場合
-```bash
-pip install ondotori-client[dataframe]
-```
-### 典型的な使い方
 ```python
 from ondotori_client.client import OndotoriClient, parse_current, parse_data
 import pandas as pd
@@ -50,6 +64,12 @@ alerts = client.get_alerts("CrZnS1")
 print(alerts)
 
 ```
+
+（以降、`get_data`／`get_latest_data`／`get_alerts` の例も載せましょう）
+
+## Contributing
+
+PR・Issue は大歓迎です！詳細は [CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
 
 ## License
 
