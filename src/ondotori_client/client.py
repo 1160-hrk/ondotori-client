@@ -16,6 +16,7 @@ Ondotori WebStorage API クライアント実装
 import json
 import logging
 from typing import Optional, Dict, Any, Tuple, Union, TYPE_CHECKING
+
 if TYPE_CHECKING:
     import pandas as pd
 from datetime import datetime
