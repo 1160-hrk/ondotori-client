@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/1160-hrk/ondotori-client/actions/workflows/ci.yml/badge.svg)](https://github.com/1160-hrk/ondotori-client/actions)
 [![PyPI version](https://img.shields.io/pypi/v/ondotori-client.svg)](https://pypi.org/project/ondotori-client/)
-[![License](https://img.shields.io/github/license/1160-hrk/ondotori-client.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/1160-hrk/ondotori-client.svg)](https://github.com/1160-hrk/ondotori-client/blob/main/LICENSE)
+
 
 ## 概要
 
