@@ -23,8 +23,8 @@ import pandas as pd
 
 
 def parse_current(
-    json_current: Dict[str, Any]
-    ) -> Tuple[datetime, float, float]:
+        json_current: Dict[str, Any]
+        ) -> Tuple[datetime, float, float]:
     """
     最新の温湿度データから時刻・温度・湿度を抽出する
     """
@@ -40,8 +40,8 @@ def parse_current(
 
 
 def parse_data(
-    json_data: Dict[str, Any]
-    ) -> Tuple[list, list, list]:
+        json_data: Dict[str, Any]
+        ) -> Tuple[list, list, list]:
     """
     データログ JSON から時刻リスト, 温度リスト, 湿度リストを生成する
     """
