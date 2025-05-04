@@ -1,0 +1,23 @@
+{
+    "api_key": "<YOUR_API_KEY>",
+    "login_id": "<YOUR_LOGIN_ID>",
+    "login_pass": "<YOUR_LOGIN_PASSWORD>",
+  
+    "default_rtr500_base": "Ce302",
+  
+    "bases": {
+      "name_base1": {
+        "serial": "<YOUR_BASE_SERIAL_FOR_BASE1>"
+      }
+    },
+  
+    "remote_map": {
+      "name1_rtr500":   { "serial": "name1_rtr500",  "type": "rtr500",  "base": "BASE1" },
+      "name2_rtr500":   { "serial": "name2_rtr500",  "type": "rtr500",  "base": "BASE1" },
+      "name3_rtr500":   { "serial": "name3_rtr500",  "type": "rtr500",  "base": "BASE1" },
+  
+      "name1_default":  { "serial": "name1_default", "type": "default" },
+      "name2_default":  { "serial": "name2_default", "type": "default" }
+    }
+  }
+  
