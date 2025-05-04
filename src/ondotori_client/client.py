@@ -155,7 +155,7 @@ class OndotoriClient:
 
     def _post(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         for attempt in range(self.retries):
-            self.logger.debug(f"POST {url} attempt={attempt+1} payload={payload}")
+            self.logger.debug(f"POST {url} attempt={attempt + 1} payload={payload}")
             resp = self.session.post(
                 url, headers=self.headers, json=payload, timeout=self.timeout
             )
@@ -163,7 +163,7 @@ class OndotoriClient:
                 resp.raise_for_status()
                 return resp.json()
             except Exception as e:
-                self.logger.warning(f"Error {e} on attempt {attempt+1}")
+                self.logger.warning(f"Error {e} on attempt {attempt + 1}")
                 if attempt == self.retries - 1:
                     raise
 
