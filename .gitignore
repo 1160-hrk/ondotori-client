@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+
+# pandas、numpy などの大きなデータ
+*.h5
+*.csv
+
+# VS Code
+.vscode/
+
+# OS 一般
+.DS_Store

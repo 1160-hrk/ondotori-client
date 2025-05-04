@@ -1,0 +1,12 @@
+[project]
+name = "ondotori-client"
+version = "0.1.0"
+description = "Ondotori WebStorage API クライアント"
+authors = [{name="あなた", email="you@example.com"}]
+readme = "README.md"
+license = {text = "MIT"}
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "^2.28"
+pandas = "^1.5"
