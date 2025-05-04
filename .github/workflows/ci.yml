@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -U pip
-          pip install -e .[dev]
+          pip install -e ".[dev,dataframe]"
 
       - name: Lint
         run: |
