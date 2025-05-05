@@ -7,11 +7,11 @@
 ## 概要
 
 Ondotori WebStorage API（RTR500B／その他機種）を Python から簡単に操作するクライアントライブラリです。
+本ライブラリは、[おんどとり WebStorage API](https://ondotori.webstorage.jp/docs/api/index.html) でデータ取得が可能な全ての機種に対応しています。
 
 ## Quickstart
 
 1. Ondotori Web Storage のアカウントを作成し、使用する機器の設定を行ってください。
-   本ライブラリは、[おんどとり WebStorage API](https://ondotori.webstorage.jp/docs/api/index.html) でデータ取得が可能な全ての機種に対応しています。
 
 2. [公式ページ](https://ondotori.webstorage.jp/docs/api/authentication/auth_apikey.html) を参照して、APIキーを取得してください。
 
