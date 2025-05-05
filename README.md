@@ -4,10 +4,27 @@
 [![PyPI version](https://img.shields.io/pypi/v/ondotori-client.svg)](https://pypi.org/project/ondotori-client/)
 [![License](https://img.shields.io/github/license/1160-hrk/ondotori-client.svg)](https://github.com/1160-hrk/ondotori-client/blob/main/LICENSE)
 
-
 ## 概要
 
 Ondotori WebStorage API（RTR500B／その他機種）を Python から簡単に操作するクライアントライブラリです。
+
+## Quickstart
+
+1. Ondotori Web Storage のアカウントを作成し、使用する機器の設定を行ってください。
+   本ライブラリは、[おんどとり WebStorage API](https://ondotori.webstorage.jp/docs/api/index.html) でデータ取得が可能な全ての機種に対応しています。
+
+2. [公式ページ](https://ondotori.webstorage.jp/docs/api/authentication/auth_apikey.html) を参照して、APIキーを取得してください。
+
+3. 本ライブラリをインストールします。
+   以下のいずれかの方法でインストールできます：
+
+   * `pip install ondotori-client`
+   * または、`src/ondotori_client` ディレクトリを直接ダウンロードして使用します。
+
+4. 下記の [`config.json` 設定ファイル](https://github.com/1160-hrk/ondotori-client?tab=readme-ov-file#configjson-%E8%A8%AD%E5%AE%9A%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB) を参照して、プロジェクトのルートディレクトリに適当な名前（例：`config.json`）で保存してください。
+   このファイルは、`OndotoriClient` のインスタンスを作成する際に必要となります。
+
+5. 次節に記載されている「典型的な使い方」を参照し、Ondotori のデータを取得してください。
 
 ## インストール
 
@@ -15,22 +32,14 @@ Ondotori WebStorage API（RTR500B／その他機種）を Python から簡単に
 pip install ondotori-client
 ````
 
-## Quickstart
-
-### DataFrame 出力を使う場合
-
-```bash
-pip install ondotori-client[dataframe]
-```
-
-### 典型的な使い方
+## 典型的な使い方
 
 ```python
 from ondotori_client.client import OndotoriClient, parse_current, parse_data
 import pandas as pd
 
 # — 設定ファイルを使う場合 —
-client = OndotoriClient(config="config.example.json", device_type="rtr500", verbose=True)
+client = OndotoriClient(config="config.json", device_type="rtr500", verbose=True)
 
 # — 1. 現在値取得 —
 data_cur = client.get_current("<remote_serial_key or remote_serial>")
@@ -55,9 +64,9 @@ print(alerts)
 
 ## `config.json` 設定ファイル
 
-`config.json` は、システムの設定を定義するファイルです。このファイルには、APIの認証情報、基本情報、接続するセンサーの設定などが含まれています。以下に、`config.json` の構造と各項目の説明を示します。
+`config.json` は、Web Storage APIの設定を定義するファイルです。このファイルには、APIの認証情報、基本情報、接続するセンサーの設定などが含まれています。以下に、`config.json` の構造と各項目の説明を示します。
 
-### 設定例 (`config.example.json`)
+### 設定例 (`configs/config.example.json`)
 
 ```json
 {
@@ -101,7 +110,7 @@ print(alerts)
 
 ### 使用方法
 
-1. **`config.example.json`** をコピーして、`config.json` ファイルを作成します。
+1. [**`configs/config.example.json`**](configs/config.example.json) をコピーして、`config.json` ファイルを作成します。
 2. 必要な設定（APIキー、ログイン情報、ベースやセンサー情報）を **`config.json`** に記入します。
 3. `config.json` をプロジェクトのルートディレクトリに配置してください。
 
