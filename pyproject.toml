@@ -2,7 +2,7 @@
 name = "ondotori-client"
 version = "0.2.1"
 description = "Ondotori WebStorage API クライアント"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
   { name = "Hiroki Tsusaka", email = "tsusaka4research@gmail.com" }
 ]
