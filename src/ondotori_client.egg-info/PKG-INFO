@@ -1,9 +1,9 @@
 Metadata-Version: 2.4
 Name: ondotori-client
-Version: 0.2.2
+Version: 0.3.0
 Summary: Ondotori WebStorage API クライアント
 Author-email: Hiroki Tsusaka <tsusaka4research@gmail.com>
-License: MIT
+License-Expression: MIT
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: requests<3.0,>=2.28
@@ -26,11 +26,11 @@ Dynamic: license-file
 ## 概要
 
 Ondotori WebStorage API（RTR500B／その他機種）を Python から簡単に操作するクライアントライブラリです。
+本ライブラリは、[おんどとり WebStorage API](https://ondotori.webstorage.jp/docs/api/index.html) でデータ取得が可能な全ての機種に対応しています。
 
 ## Quickstart
 
 1. Ondotori Web Storage のアカウントを作成し、使用する機器の設定を行ってください。
-   本ライブラリは、[おんどとり WebStorage API](https://ondotori.webstorage.jp/docs/api/index.html) でデータ取得が可能な全ての機種に対応しています。
 
 2. [公式ページ](https://ondotori.webstorage.jp/docs/api/authentication/auth_apikey.html) を参照して、APIキーを取得してください。
 
