@@ -243,4 +243,6 @@ class OndotoriClient:
         payload = {**self._auth, "remote-serial": serial}
         if self.device_type == "rtr500":
             payload["base-serial"] = self._resolve_base(remote_key)
+        else:
+            payload["base-serial"] = serial
         return self._post(self._URL_ALERT, payload)
