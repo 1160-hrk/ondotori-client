@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: ondotori-client
-Version: 0.3.1
+Version: 0.3.2
 Summary: Ondotori WebStorage API クライアント
 Author-email: Hiroki Tsusaka <tsusaka4research@gmail.com>
 License-Expression: MIT

@@ -144,7 +144,7 @@ class OndotoriClient:
     def _resolve_base(self, remote_key: str) -> str:
         # リモートキーからベースシリアルを取得
         info = self._remote_map.get(remote_key, {})
-        base_name = info.get("base", self._default_base)
+        base_name = info.get("base", "")
         base_info = self._bases.get(base_name)
         if not base_info:
             # raise KeyError(f"Base '{base_name}' が設定にありません")
