@@ -147,7 +147,8 @@ class OndotoriClient:
         base_name = info.get("base", self._default_base)
         base_info = self._bases.get(base_name)
         if not base_info:
-            raise KeyError(f"Base '{base_name}' が設定にありません")
+            # raise KeyError(f"Base '{base_name}' が設定にありません")
+            return info.get("serial")
         return base_info["serial"]
 
     def _to_timestamp(self, dt: Union[datetime, int, str]) -> int:
@@ -241,8 +242,5 @@ class OndotoriClient:
         """アラートログ取得"""
         serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
-        if self.device_type == "rtr500":
-            payload["base-serial"] = self._resolve_base(remote_key)
-        else:
-            payload["base-serial"] = serial
+        payload["base-serial"] = self._resolve_base(remote_key)
         return self._post(self._URL_ALERT, payload)
