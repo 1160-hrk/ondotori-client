@@ -39,25 +39,25 @@ from ondotori_client.client import OndotoriClient, parse_current, parse_data
 import pandas as pd
 
 # — 設定ファイルを使う場合 —
-client = OndotoriClient(config="config.json", device_type="rtr500", verbose=True)
+client = OndotoriClient(config="config.json", verbose=True)
 
 # — 1. 現在値取得 —
-data_cur = client.get_current("<remote_serial_key or remote_serial>")
+data_cur = client.get_current("<remote_serial_key>")
 ts, temp, hum = parse_current(data_cur)
 print(f"現在値: {ts} — {temp}℃ / {hum}%")
 
 # — 2. 過去指定期間のログ取得 —
-res = client.get_data("<remote_serial_key or remote_serial>", dt_from="2025-05-01T00:00:00", dt_to="2025-05-02T00:00:00")
+res = client.get_data("<remote_serial_key>", dt_from="2025-05-01T00:00:00", dt_to="2025-05-02T00:00:00")
 times, temps, hums = parse_data(res)
 df = pd.DataFrame({"time": times, "temp": temps, "hum": hums})
 print(df.head())
 
 # — 3. 直近300件ログ(または hours=1)を DataFrame で —
-df_latest = client.get_data("<remote_serial_key or remote_serial>", hours=1, as_df=True)
+df_latest = client.get_data("<remote_serial_key>", hours=1, as_df=True)
 print(df_latest.tail())
 
 # — 4. アラートログ取得 —
-alerts = client.get_alerts("<remote_serial_key or remote_serial>")
+alerts = client.get_alerts("<remote_serial_key>")
 print(alerts)
 
 ```
