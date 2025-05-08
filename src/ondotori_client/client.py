@@ -245,7 +245,7 @@ class OndotoriClient:
             device_type_a = self._remote_map[remote_key]["type"]
         else:
             device_type_a = self.device_type
-        if self.device_type == "rtr500":
+        if device_type_a == "rtr500":
             url = self._URL_LATEST_RTR500
             payload["base-serial"] = self._resolve_base(remote_key)
         else:
