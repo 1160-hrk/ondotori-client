@@ -19,8 +19,6 @@
       }
     }
   },
-  // 開発用依存がすでにイメージに入っているので不要ですが、
-  // 追加で postCreateCommand を走らせたい場合は requirements-dev.txt だけ。
   "postCreateCommand": "pip install --no-cache-dir -r requirements-dev.txt",
   "remoteUser": "root"
 }

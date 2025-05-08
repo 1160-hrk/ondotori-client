@@ -186,6 +186,7 @@ class OndotoriClient:
         count: Optional[int] = None,
         hours: Optional[int] = None,
         as_df: bool = False,
+        device_type: Optional[str] = None
     ) -> Union[Dict[str, Any], pd.DataFrame]:
         """期間/件数指定データ取得"""
         # 時間レンジ計算
@@ -199,8 +200,13 @@ class OndotoriClient:
 
         serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
-
-        if self.device_type == "rtr500":
+        if device_type is not None:
+            device_type_a = device_type
+        elif self._remote_map.get(remote_key, {}).get("type") is not None:
+            device_type_a = self._remote_map[remote_key]["type"]
+        else:
+            device_type_a = self.device_type
+        if device_type_a == "rtr500":
             url = self._URL_DATA_RTR500
             payload["base-serial"] = self._resolve_base(remote_key)
         else:
@@ -227,10 +233,16 @@ class OndotoriClient:
             return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
         return result
 
-    def get_latest_data(self, remote_key: str) -> Dict[str, Any]:
+    def get_latest_data(self, remote_key: str, device_type: Optional[str] = None) -> Dict[str, Any]:
         """最新データ取得"""
         serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
+        if device_type is not None:
+            device_type_a = device_type
+        elif self._remote_map.get(remote_key, {}).get("type") is not None:
+            device_type_a = self._remote_map[remote_key]["type"]
+        else:
+            device_type_a = self.device_type
         if self.device_type == "rtr500":
             url = self._URL_LATEST_RTR500
             payload["base-serial"] = self._resolve_base(remote_key)
