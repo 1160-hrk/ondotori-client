@@ -1,6 +1,6 @@
 # src/ondotori_client/__init__.py
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 from .client import OndotoriClient, parse_current, parse_data
 
