@@ -186,7 +186,7 @@ class OndotoriClient:
         count: Optional[int] = None,
         hours: Optional[int] = None,
         as_df: bool = False,
-        device_type: Optional[str] = None
+        device_type: Optional[str] = None,
     ) -> Union[Dict[str, Any], pd.DataFrame]:
         """期間/件数指定データ取得"""
         # 時間レンジ計算
@@ -233,7 +233,9 @@ class OndotoriClient:
             return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
         return result
 
-    def get_latest_data(self, remote_key: str, device_type: Optional[str] = None) -> Dict[str, Any]:
+    def get_latest_data(
+        self, remote_key: str, device_type: Optional[str] = None
+    ) -> Dict[str, Any]:
         """最新データ取得"""
         serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
