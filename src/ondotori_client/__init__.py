@@ -1,6 +1,9 @@
 # src/ondotori_client/__init__.py
 
-from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFound
+from importlib.metadata import (
+    version as _pkg_version,
+    PackageNotFoundError as _PkgNotFound,
+)
 
 try:
     __version__ = _pkg_version(__name__.replace("_", "-"))

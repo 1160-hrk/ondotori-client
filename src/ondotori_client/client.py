@@ -161,7 +161,11 @@ class OndotoriClient:
                 try:
                     self._save_config()
                 except Exception as e:
-                    self.logger.warning(f"Failed to auto-create config file {self._config_path}: {e}")
+                    self.logger.warning(
+                        "Failed to auto-create config file %s: %s",
+                        self._config_path,
+                        e,
+                    )
 
     def _resolve_base(self, remote_key: str) -> Optional[str]:
         # リモートキーからベースシリアルを取得
@@ -190,7 +194,7 @@ class OndotoriClient:
                 resp.raise_for_status()
                 return resp.json()
             except Exception as e:
-                self.logger.warning(f"Error {e} on attempt {attempt + 1}")
+                self.logger.warning("Error %s on attempt %s", e, attempt + 1)
                 if attempt == self.retries - 1:
                     raise
         # ここには到達しない想定だが、型チェック回避のため例外を送出
@@ -260,7 +264,7 @@ class OndotoriClient:
                 raise ImportError(
                     "pandas がインストールされていないため DataFrame 出力できません。"
                     " `pip install ondotori-client[dataframe]` をお試しください。"
-                )
+                )  # noqa: E501
             times, temps, hums = parse_data(result)
             return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
         return result
@@ -317,7 +321,9 @@ class OndotoriClient:
                 json.dump(cfg_out, f, ensure_ascii=False, indent=2)
             self.logger.debug(f"Config saved to {self._config_path}")
         except Exception as e:
-            self.logger.warning(f"Failed to save config to {self._config_path}: {e}")
+            self.logger.warning(
+                "Failed to save config to %s: %s", self._config_path, e
+            )
 
     def _update_remote_map(self, remote_key: str, serial: str, device_type: str, base_serial: Optional[str] = None) -> None:
         """remote_map に情報を追加し、必要なら設定を保存"""
