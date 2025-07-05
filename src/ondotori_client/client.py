@@ -258,9 +258,7 @@ class OndotoriClient:
             base_serial_for_map = self._resolve_base(remote_key)
         else:
             base_serial_for_map = None
-        self._update_remote_map(
-            remote_key, serial, device_type_a, base_serial_for_map
-        )
+        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
 
         if dt_from_unix is not None:
             payload["unixtime-from"] = dt_from_unix
@@ -279,9 +277,7 @@ class OndotoriClient:
                 )
                 raise ImportError(msg)
             times, temps, hums = parse_data(result)
-            return pd.DataFrame(
-                {"timestamp": times, "temp_C": temps, "hum_%": hums}
-            )
+            return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
         return result
 
     def get_latest_data(
@@ -306,9 +302,7 @@ class OndotoriClient:
             base_serial_for_map = self._resolve_base(remote_key)
         else:
             base_serial_for_map = None
-        self._update_remote_map(
-            remote_key, serial, device_type_a, base_serial_for_map
-        )
+        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
         return self._post(url, payload)
 
     def get_alerts(self, remote_key: str) -> Dict[str, Any]:
@@ -317,9 +311,7 @@ class OndotoriClient:
         payload = {**self._auth, "remote-serial": serial}
         payload["base-serial"] = self._resolve_base(remote_key)
         # remote_map 更新（RTR500 前提）
-        self._update_remote_map(
-            remote_key, serial, "rtr500", payload["base-serial"]
-        )
+        self._update_remote_map(remote_key, serial, "rtr500", payload["base-serial"])
         return self._post(self._URL_ALERT, payload)
 
     # ------------------------------------------------------------------
@@ -343,9 +335,7 @@ class OndotoriClient:
                 json.dump(cfg_out, f, ensure_ascii=False, indent=2)
             self.logger.debug("Config saved to %s", self._config_path)
         except Exception as e:
-            self.logger.warning(
-                "Failed to save config to %s: %s", self._config_path, e
-            )
+            self.logger.warning("Failed to save config to %s: %s", self._config_path, e)
 
     def _update_remote_map(
         self,
