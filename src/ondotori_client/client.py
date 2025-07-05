@@ -210,7 +210,9 @@ class OndotoriClient:
         serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": [serial]}
         # デバイスタイプ決定
-        device_type_a = self._remote_map.get(remote_key, {}).get("type", self.device_type)
+        device_type_a = self._remote_map.get(remote_key, {}).get(
+            "type", self.device_type
+            )
         # remote_map へ登録 (base は不要)
         self._update_remote_map(remote_key, serial, device_type_a)
         return self._post(self._URL_CURRENT, payload)
@@ -256,7 +258,9 @@ class OndotoriClient:
             base_serial_for_map = self._resolve_base(remote_key)
         else:
             base_serial_for_map = None
-        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
+        self._update_remote_map(
+            remote_key, serial, device_type_a, base_serial_for_map
+            )
 
         if dt_from_unix is not None:
             payload["unixtime-from"] = dt_from_unix
@@ -269,12 +273,15 @@ class OndotoriClient:
             try:
                 import pandas as pd
             except ImportError:
-                raise ImportError(
-                    "pandas がインストールされていないため DataFrame 出力できません。"
-                    " `pip install ondotori-client[dataframe]` をお試しください。"
-                )  # noqa: E501
+                msg = (
+                    "pandas がインストールされていないため DataFrame 出力できません。 "
+                    "`pip install ondotori-client[dataframe]` をお試しください。"
+                )
+                raise ImportError(msg)
             times, temps, hums = parse_data(result)
-            return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
+            return pd.DataFrame(
+                {"timestamp": times, "temp_C": temps, "hum_%": hums}
+                )
         return result
 
     def get_latest_data(
@@ -299,7 +306,9 @@ class OndotoriClient:
             base_serial_for_map = self._resolve_base(remote_key)
         else:
             base_serial_for_map = None
-        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
+        self._update_remote_map(
+            remote_key, serial, device_type_a, base_serial_for_map
+            )
         return self._post(url, payload)
 
     def get_alerts(self, remote_key: str) -> Dict[str, Any]:
@@ -308,7 +317,9 @@ class OndotoriClient:
         payload = {**self._auth, "remote-serial": serial}
         payload["base-serial"] = self._resolve_base(remote_key)
         # remote_map 更新（RTR500 前提）
-        self._update_remote_map(remote_key, serial, "rtr500", payload["base-serial"])
+        self._update_remote_map(
+            remote_key, serial, "rtr500", payload["base-serial"]
+            )
         return self._post(self._URL_ALERT, payload)
 
     # ------------------------------------------------------------------
@@ -336,7 +347,13 @@ class OndotoriClient:
                 "Failed to save config to %s: %s", self._config_path, e
             )
 
-    def _update_remote_map(self, remote_key: str, serial: str, device_type: str, base_serial: Optional[str] = None) -> None:
+    def _update_remote_map(
+        self,
+        remote_key: str,
+        serial: str,
+        device_type: str,
+        base_serial: Optional[str] = None,
+    ) -> None:
         """remote_map に情報を追加し、必要なら設定を保存"""
         if not self._auto_save_config:
             return
