@@ -30,19 +30,21 @@
 
 * 取得したデータを格納した辞書。
 
-#### `get_data(self, remote_key: str, dt_from: Optional[str] = None, dt_to: Optional[str] = None, hours: Optional[int] = None, as_df: bool = False) -> Union[Dict[str, Any], pd.DataFrame]`
+#### `get_data(self, remote_key: str, dt_from: Optional[str] = None, dt_to: Optional[str] = None, count: Optional[int] = None, hours: Optional[int] = None, as_df: bool = False, device_type: Optional[str] = None) -> Union[Dict[str, Any], pd.DataFrame]`
 
-指定した期間のデータを取得します。
+指定した期間・件数のデータを取得します。
 
-* **remote\_serial** (`str`): ```config.json```で設定したリモートセンサーのキー。```config.json```を使用していない場合や直接シリアル番号を入力したい場合はシリアル番号を入力する。
-* **dt\_from** (`str`, オプション): 取得開始日時（ISO 8601形式、```datetime```型オブジェクト、またはint型のUNIXタイムスタンプ）。指定しない場合、`hours`引数を使用します。
-* **dt\_to** (`str`, オプション): 取得終了日時（ISO 8601形式、```datetime```型オブジェクト、またはint型のUNIXタイムスタンプ）。指定しない場合、現在時刻が使用されます。
-* **hours** (`int`, オプション): 取得する過去の時間数。`dt_from`と`dt_to`が指定されない場合、この値が使用されます。
-* **as\_df** (`bool`, デフォルト: `False`): DataFrame形式でデータを取得するかどうか。（```True```の場合は```pandas```をインストールしている必要があります。）
+* **remote_key** (`str`): ```config.json```で設定したリモートセンサーのキー。```config.json```を使用していない場合や直接シリアル番号を入力したい場合はシリアル番号を入力する。
+* **dt_from** (`str` | `datetime` | `int`, オプション): 取得開始日時（ISO 8601形式、`datetime`型、またはUNIXタイムスタンプ）。
+* **dt_to** (`str` | `datetime` | `int`, オプション): 取得終了日時。
+* **count** (`int`, オプション): 取得件数（`device_type="default"` のみ有効）。
+* **hours** (`int`, オプション): 過去何時間分を取得するか。`dt_from` と `dt_to` が指定されない場合に使用。
+* **as_df** (`bool`, デフォルト: `False`): DataFrame形式でデータを取得するかどうか。(```True```の場合は```pandas```のインストールが必要)
+* **device_type** (`str`, オプション): デバイスタイプを個別に上書きしたい場合に指定 (`"default"` または `"rtr500"`)。
 
 戻り値:
 
-* データが辞書形式で返されますが、`as_df=True`の場合、`pandas.DataFrame`形式で返されます。
+* データが辞書形式で返されますが、`as_df=True` の場合、`pandas.DataFrame` 形式で返されます。
 
 #### `get_latest_data(self, remote_key: str) -> Dict[str, Any]`
 

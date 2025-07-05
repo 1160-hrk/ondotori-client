@@ -25,7 +25,7 @@ print(f"現在値({sensor_key}) - {ts}: {temp:.1f} ℃, {hum:.1f}%")
 # 過去1時間分のデータを DataFrame で取得
 df = client.get_data(sensor_key, hours=1, as_df=True)
 print(df.head())
-````
+```
 
 ### 2. 直接引数を指定する方法
 
@@ -117,6 +117,10 @@ ax2.plot(times, hums, label="Humidity (%)", linestyle='--')
 ax2.set_ylabel("Humidity (%)")
 plt.show()
 ```
+
+## 詳細な使い方
+
+さらに高度なオプションや内部挙動を知りたい場合は、[`docs/usage_advanced.md`](usage_advanced.md) を参照してください。
 
 ## 結論
 
