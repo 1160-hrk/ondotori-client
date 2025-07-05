@@ -186,7 +186,12 @@ class OndotoriClient:
 
     def _post(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         for attempt in range(self.retries):
-            self.logger.debug(f"POST {url} attempt={attempt + 1} payload={payload}")
+            self.logger.debug(
+                "POST %s attempt=%s payload_len=%s",
+                url,
+                attempt + 1,
+                len(str(payload)),
+            )
             resp = self.session.post(
                 url, headers=self.headers, json=payload, timeout=self.timeout
             )
@@ -247,7 +252,10 @@ class OndotoriClient:
                 payload["number"] = count
 
         # remote_map 更新
-        base_serial_for_map = self._resolve_base(remote_key) if device_type_a == "rtr500" else None
+        if device_type_a == "rtr500":
+            base_serial_for_map = self._resolve_base(remote_key)
+        else:
+            base_serial_for_map = None
         self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
 
         if dt_from_unix is not None:
@@ -287,7 +295,10 @@ class OndotoriClient:
         else:
             url = self._URL_LATEST_DEFAULT
         # remote_map 更新
-        base_serial_for_map = self._resolve_base(remote_key) if device_type_a == "rtr500" else None
+        if device_type_a == "rtr500":
+            base_serial_for_map = self._resolve_base(remote_key)
+        else:
+            base_serial_for_map = None
         self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
         return self._post(url, payload)
 
@@ -319,7 +330,7 @@ class OndotoriClient:
         try:
             with open(self._config_path, "w", encoding="utf-8") as f:
                 json.dump(cfg_out, f, ensure_ascii=False, indent=2)
-            self.logger.debug(f"Config saved to {self._config_path}")
+            self.logger.debug("Config saved to %s", self._config_path)
         except Exception as e:
             self.logger.warning(
                 "Failed to save config to %s: %s", self._config_path, e
