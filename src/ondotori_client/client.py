@@ -212,7 +212,7 @@ class OndotoriClient:
         # デバイスタイプ決定
         device_type_a = self._remote_map.get(remote_key, {}).get(
             "type", self.device_type
-            )
+        )
         # remote_map へ登録 (base は不要)
         self._update_remote_map(remote_key, serial, device_type_a)
         return self._post(self._URL_CURRENT, payload)
