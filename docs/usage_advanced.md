@@ -1,7 +1,6 @@
 # Ondotori Client 詳細ガイド（Advanced Usage）
 
-本ドキュメントでは `src/ondotori_client/client.py` に実装されている **OndotoriClient** と補助関数 **parse_current / parse_data** のすべての機能と使い方を解説します。公式ドキュメントでは触れられていない細部まで網羅しているため、ライブラリを最大限に活用したい方はぜひご参照ください。
-
+本ドキュメントでは `src/ondotori_client/client.py` に実装されている **OndotoriClient** と補助関数 **parse_current / parse_data** のすべての機能と使い方を解説します。
 ---
 
 ## 目次

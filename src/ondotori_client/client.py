@@ -18,6 +18,7 @@ Ondotori WebStorage API クライアント実装
 import json
 import logging
 from typing import Optional, Dict, Any, Tuple, Union, TYPE_CHECKING
+import os
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -65,6 +66,8 @@ class OndotoriClient:
         verbose: デバッグログ出力
         session: カスタム requests.Session
         logger: カスタム logging.Logger
+        auto_save_config: 設定を自動保存するかどうか
+        config_path: 設定ファイルのパス
     """
 
     # エンドポイント定義
@@ -88,6 +91,8 @@ class OndotoriClient:
         verbose: bool = False,
         session: Optional[requests.Session] = None,
         logger: Optional[logging.Logger] = None,
+        auto_save_config: bool = True,
+        config_path: str = "config.json",
     ):
         # 設定ロード
         if isinstance(config, str):
@@ -141,7 +146,24 @@ class OndotoriClient:
             level=level, format="%(asctime)s %(levelname)s: %(message)s"
         )
 
-    def _resolve_base(self, remote_key: str) -> str:
+        # 自動保存設定
+        self._auto_save_config = auto_save_config
+        # どのパスに保存するか — 明示的に文字列パスが渡された場合はそれを尊重
+        if isinstance(config, str):
+            self._config_path = config
+        else:
+            self._config_path = config_path
+
+        # config が dict/None から生成された場合、自動で保存
+        if self._auto_save_config and (cfg is None or not isinstance(config, str)):
+            # 既にファイルが存在する場合は上書きしない（後続で _save_config 呼び出し時に更新）
+            if not os.path.exists(self._config_path):
+                try:
+                    self._save_config()
+                except Exception as e:
+                    self.logger.warning(f"Failed to auto-create config file {self._config_path}: {e}")
+
+    def _resolve_base(self, remote_key: str) -> Optional[str]:
         # リモートキーからベースシリアルを取得
         info = self._remote_map.get(remote_key, {})
         base_name = info.get("base", "")
@@ -171,11 +193,17 @@ class OndotoriClient:
                 self.logger.warning(f"Error {e} on attempt {attempt + 1}")
                 if attempt == self.retries - 1:
                     raise
+        # ここには到達しない想定だが、型チェック回避のため例外を送出
+        raise RuntimeError("_post: Unexpected exit without response")
 
     def get_current(self, remote_key: str) -> Dict[str, Any]:
         """現在値取得"""
         serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": [serial]}
+        # デバイスタイプ決定
+        device_type_a = self._remote_map.get(remote_key, {}).get("type", self.device_type)
+        # remote_map へ登録 (base は不要)
+        self._update_remote_map(remote_key, serial, device_type_a)
         return self._post(self._URL_CURRENT, payload)
 
     def get_data(
@@ -214,6 +242,10 @@ class OndotoriClient:
             if count is not None:
                 payload["number"] = count
 
+        # remote_map 更新
+        base_serial_for_map = self._resolve_base(remote_key) if device_type_a == "rtr500" else None
+        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
+
         if dt_from_unix is not None:
             payload["unixtime-from"] = dt_from_unix
         if dt_to_unix is not None:
@@ -250,6 +282,9 @@ class OndotoriClient:
             payload["base-serial"] = self._resolve_base(remote_key)
         else:
             url = self._URL_LATEST_DEFAULT
+        # remote_map 更新
+        base_serial_for_map = self._resolve_base(remote_key) if device_type_a == "rtr500" else None
+        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
         return self._post(url, payload)
 
     def get_alerts(self, remote_key: str) -> Dict[str, Any]:
@@ -257,4 +292,45 @@ class OndotoriClient:
         serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
         payload = {**self._auth, "remote-serial": serial}
         payload["base-serial"] = self._resolve_base(remote_key)
+        # remote_map 更新（RTR500 前提）
+        self._update_remote_map(remote_key, serial, "rtr500", payload["base-serial"])
         return self._post(self._URL_ALERT, payload)
+
+    # ------------------------------------------------------------------
+    # プライベート: 設定ファイル保存／更新処理
+    # ------------------------------------------------------------------
+
+    def _save_config(self) -> None:
+        """現在の設定を JSON で保存 (indent=2, UTF-8)"""
+        if not self._auto_save_config:
+            return
+        cfg_out = {
+            "api_key": self._auth.get("api-key"),
+            "login_id": self._auth.get("login-id"),
+            "login_pass": self._auth.get("login-pass"),
+            "default_rtr500_base": self._default_base,
+            "bases": self._bases,
+            "remote_map": self._remote_map,
+        }
+        try:
+            with open(self._config_path, "w", encoding="utf-8") as f:
+                json.dump(cfg_out, f, ensure_ascii=False, indent=2)
+            self.logger.debug(f"Config saved to {self._config_path}")
+        except Exception as e:
+            self.logger.warning(f"Failed to save config to {self._config_path}: {e}")
+
+    def _update_remote_map(self, remote_key: str, serial: str, device_type: str, base_serial: Optional[str] = None) -> None:
+        """remote_map に情報を追加し、必要なら設定を保存"""
+        if not self._auto_save_config:
+            return
+        if remote_key in self._remote_map:
+            return  # 既に登録済み
+        info: Dict[str, Any] = {"serial": serial}
+        if device_type:
+            info["type"] = device_type
+        if device_type == "rtr500" and base_serial:
+            # base 名は default_rtr500_base を使用
+            info["base"] = self._default_base
+        self._remote_map[remote_key] = info
+        # 保存
+        self._save_config()
