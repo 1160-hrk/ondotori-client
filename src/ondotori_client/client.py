@@ -260,7 +260,7 @@ class OndotoriClient:
             base_serial_for_map = None
         self._update_remote_map(
             remote_key, serial, device_type_a, base_serial_for_map
-            )
+        )
 
         if dt_from_unix is not None:
             payload["unixtime-from"] = dt_from_unix
@@ -281,7 +281,7 @@ class OndotoriClient:
             times, temps, hums = parse_data(result)
             return pd.DataFrame(
                 {"timestamp": times, "temp_C": temps, "hum_%": hums}
-                )
+            )
         return result
 
     def get_latest_data(
@@ -308,7 +308,7 @@ class OndotoriClient:
             base_serial_for_map = None
         self._update_remote_map(
             remote_key, serial, device_type_a, base_serial_for_map
-            )
+        )
         return self._post(url, payload)
 
     def get_alerts(self, remote_key: str) -> Dict[str, Any]:
@@ -319,7 +319,7 @@ class OndotoriClient:
         # remote_map 更新（RTR500 前提）
         self._update_remote_map(
             remote_key, serial, "rtr500", payload["base-serial"]
-            )
+        )
         return self._post(self._URL_ALERT, payload)
 
     # ------------------------------------------------------------------
