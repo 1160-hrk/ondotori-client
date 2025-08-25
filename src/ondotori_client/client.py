@@ -37,8 +37,14 @@ def parse_current(json_current: Dict[str, Any]) -> Tuple[datetime, float, float]
     d = devices[0]
     ts = datetime.fromtimestamp(int(d["unixtime"]))
     ch = d.get("channel", [])
-    temp = float(ch[0]["value"]) if len(ch) > 0 else float("nan")
-    hum = float(ch[1]["value"]) if len(ch) > 1 else float("nan")
+    try:
+        temp = float(ch[0]["value"]) if len(ch) > 0 else float("nan")
+    except ValueError:
+        temp = float("nan")
+    try:
+        hum = float(ch[1]["value"]) if len(ch) > 1 else float("nan")
+    except ValueError:
+        hum = float("nan")
     return ts, temp, hum
 
 
@@ -48,8 +54,17 @@ def parse_data(json_data: Dict[str, Any]) -> Tuple[list, list, list]:
     """
     rows = json_data.get("data", [])
     times = [datetime.fromtimestamp(int(r["unixtime"])) for r in rows]
-    temps = [float(r.get("ch1", float("nan"))) for r in rows]
-    hums = [float(r.get("ch2", float("nan"))) for r in rows]
+    temps = []
+    hums = []
+    for r in rows:
+        try:
+            temps.append(float(r.get("ch1", float("nan"))))
+        except ValueError:
+            temps.append(float("nan"))
+        try:
+            hums.append(float(r.get("ch2", float("nan"))))
+        except ValueError:
+            hums.append(float("nan"))
     return times, temps, hums
 
 
