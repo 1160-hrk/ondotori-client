@@ -17,7 +17,6 @@ from zoneinfo import ZoneInfo
 
 from ondotori_client import OndotoriClient, parse_current
 
-
 CONFIG_PATH = Path("configs/config.json")
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -29,8 +28,7 @@ def load_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
 
     if not isinstance(config, dict):
         raise ValueError(
-            f"設定ファイルのルートは JSON オブジェクトである必要があります: "
-            f"{path}"
+            f"設定ファイルのルートは JSON オブジェクトである必要があります: {path}"
         )
 
     return config
@@ -77,9 +75,7 @@ def example_direct_args() -> None:
     default_base_name = config.get("default_rtr500_base")
 
     if not isinstance(default_base_name, str) or not default_base_name:
-        raise ValueError(
-            "config.json に default_rtr500_base が設定されていません"
-        )
+        raise ValueError("config.json に default_rtr500_base が設定されていません")
 
     bases = config.get("bases")
 
@@ -99,9 +95,7 @@ def example_direct_args() -> None:
     base_serial = base_config.get("serial")
 
     if not isinstance(base_serial, str) or not base_serial:
-        raise ValueError(
-            f"親機 {default_base_name!r} に serial が設定されていません"
-        )
+        raise ValueError(f"親機 {default_base_name!r} に serial が設定されていません")
 
     api_key = config.get("api_key")
     login_id = config.get("login_id")
@@ -133,9 +127,7 @@ def example_direct_args() -> None:
         data_rows = latest_data.get("data", [])
 
         if not isinstance(data_rows, list):
-            raise ValueError(
-                "API 応答の data がリストではありません"
-            )
+            raise ValueError("API 応答の data がリストではありません")
 
         print(f"最新データ件数: {len(data_rows)}")
 
