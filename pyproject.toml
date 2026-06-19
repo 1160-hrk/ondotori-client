@@ -25,7 +25,7 @@ dev = [
 # DataFrame 出力機能を使いたい人向けエクストラ
 dataframe = [
   "numpy>=1.23,<2.0",
-  "pandas>=1.5,<2.0",
+  "pandas>=2.1.1,<3.0.0",
 ]
 
 [build-system]

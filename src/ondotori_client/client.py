@@ -1,375 +1,649 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
-"""
-client.py
-
-Ondotori WebStorage API クライアント実装
-
-対応デバイスタイプ:
-  - "default": TR7A2/7A, TR-7nw/wb/wf, TR4A, TR32B 系列
-  - "rtr500": RTR500B 系列
-
-設定は以下のいずれかで注入可能:
-  1. 設定ファイルパス (config.json)
-  2. 読み込み済み設定辞書 (dict)
-  3. 直接認証情報・base_serial を引数で指定
-"""
-import json
 import logging
-from typing import Optional, Dict, Any, Tuple, Union, TYPE_CHECKING
 import os
-
-if TYPE_CHECKING:
-    import pandas as pd
-from datetime import datetime
+import warnings
+from collections.abc import Mapping
+from datetime import UTC, datetime, tzinfo
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import requests
 
+from .config import ClientConfig, DeviceType, validate_device_type
+from .exceptions import ConfigurationError, RequestValidationError
+from .models import MeasurementRecord, ResolvedRemote, TimeRange
+from .parsers import parse_data_records, parse_temperature_humidity_data
+from .transport import HTTPTransport, RetryPolicy, Timeout
 
-def parse_current(json_current: Dict[str, Any]) -> Tuple[datetime, float, float]:
-    """
-    最新の温湿度データから時刻・温度・湿度を抽出する
-    """
-    devices = json_current.get("devices", [])
-    if not devices:
-        raise ValueError("No device data in response")
-    d = devices[0]
-    ts = datetime.fromtimestamp(int(d["unixtime"]))
-    ch = d.get("channel", [])
-    try:
-        temp = float(ch[0]["value"]) if len(ch) > 0 else float("nan")
-    except ValueError:
-        temp = float("nan")
-    try:
-        hum = float(ch[1]["value"]) if len(ch) > 1 else float("nan")
-    except ValueError:
-        hum = float("nan")
-    return ts, temp, hum
+if TYPE_CHECKING:
+    import pandas as pd
 
 
-def parse_data(json_data: Dict[str, Any]) -> Tuple[list, list, list]:
-    """
-    データログ JSON から時刻リスト, 温度リスト, 湿度リストを生成する
-    """
-    rows = json_data.get("data", [])
-    times = [datetime.fromtimestamp(int(r["unixtime"])) for r in rows]
-    temps = []
-    hums = []
-    for r in rows:
-        try:
-            temps.append(float(r.get("ch1", float("nan"))))
-        except ValueError:
-            temps.append(float("nan"))
-        try:
-            hums.append(float(r.get("ch2", float("nan"))))
-        except ValueError:
-            hums.append(float("nan"))
-    return times, temps, hums
+DateTimeInput = datetime | int | float | str
+_LOGGER = logging.getLogger(__name__)
 
 
 class OndotoriClient:
-    """
-    Ondotori WebStorage API クライアント
+    """Ondotori WebStorage API クライアント．"""
 
-    コンストラクタ引数:
-        config: 設定ファイルパス(str) または 設定辞書(dict)
-        api_key, login_id, login_pass, base_serial: 直接指定する場合
-        device_type: "default" or "rtr500"
-        retries: リトライ回数
-        timeout: HTTPリクエストタイムアウト秒
-        verbose: デバッグログ出力
-        session: カスタム requests.Session
-        logger: カスタム logging.Logger
-        auto_save_config: 設定を自動保存するかどうか
-        config_path: 設定ファイルのパス
-    """
-
-    # エンドポイント定義
     _URL_CURRENT = "https://api.webstorage.jp/v1/devices/current"
     _URL_DATA_DEFAULT = "https://api.webstorage.jp/v1/devices/data"
     _URL_DATA_RTR500 = "https://api.webstorage.jp/v1/devices/data-rtr500"
     _URL_LATEST_DEFAULT = "https://api.webstorage.jp/v1/devices/latest-data"
-    _URL_LATEST_RTR500 = "https://api.webstorage.jp/v1/devices/latest-data-rtr500"
+    _URL_LATEST_RTR500 = (
+        "https://api.webstorage.jp/v1/devices/latest-data-rtr500"
+    )
     _URL_ALERT = "https://api.webstorage.jp/v1/devices/alert"
+
+    _HEADERS = {
+        "Content-Type": "application/json",
+        "X-HTTP-Method-Override": "GET",
+    }
 
     def __init__(
         self,
-        config: Union[str, Dict[str, Any], None] = None,
-        api_key: Optional[str] = None,
-        login_id: Optional[str] = None,
-        login_pass: Optional[str] = None,
-        base_serial: Optional[str] = None,
-        device_type: str = "default",
+        config: (
+            ClientConfig
+            | str
+            | os.PathLike[str]
+            | Mapping[str, Any]
+            | None
+        ) = None,
+        api_key: str | None = None,
+        login_id: str | None = None,
+        login_pass: str | None = None,
+        base_serial: str | None = None,
+        device_type: DeviceType = "default",
         retries: int = 3,
-        timeout: float = 10.0,
+        timeout: Timeout = 10.0,
         verbose: bool = False,
-        session: Optional[requests.Session] = None,
-        logger: Optional[logging.Logger] = None,
-        auto_save_config: bool = True,
-        config_path: str = "config.json",
-    ):
-        # 設定ロード
-        if isinstance(config, str):
-            with open(config, encoding="utf-8") as f:
-                cfg = json.load(f)
-        elif isinstance(config, dict):
-            cfg = config
-        else:
-            cfg = None
+        session: requests.Session | None = None,
+        logger: logging.Logger | None = None,
+        transport: HTTPTransport | None = None,
+        default_timezone: tzinfo = UTC,
+        auto_save_config: bool | None = None,
+        config_path: str | os.PathLike[str] | None = None,
+    ) -> None:
+        """
+        config には ClientConfig，設定ファイルパス，または設定辞書を
+        指定する．config を省略する場合は認証情報を直接指定する．
 
-        # 認証情報 & 設定辞書セットアップ
-        if cfg is not None:
-            self._auth = {
-                "api-key": cfg["api_key"],
-                "login-id": cfg["login_id"],
-                "login-pass": cfg["login_pass"],
-            }
-            self._bases = cfg.get("bases", {})
-            self._default_base = cfg.get("default_rtr500_base")
-            self._remote_map = cfg.get("remote_map", {})
-        else:
-            if not all([api_key, login_id, login_pass, base_serial]):
-                raise ValueError(
-                    "api_key, login_id, login_pass, base_serial が必要です"
-                )
-            self._auth = {
-                "api-key": api_key,
-                "login-id": login_id,
-                "login-pass": login_pass,
-            }
-            # 直接指定用の単一ベース
-            self._bases = {"default": {"serial": base_serial}}
-            self._default_base = "default"
-            self._remote_map = {}
+        auto_save_config と config_path は旧 API 互換用であり，設定の
+        自動保存は行わない．
+        """
+        self.logger = logger or _LOGGER
+        if verbose:
+            self.logger.setLevel(logging.DEBUG)
 
-        self.device_type = device_type
-        self.retries = retries
-        self.timeout = timeout
-
-        # HTTP セッション & ヘッダ
-        self.session = session or requests.Session()
-        self.headers = {
-            "Content-Type": "application/json",
-            "X-HTTP-Method-Override": "GET",
-        }
-
-        # ロガー初期化
-        self.logger = logger or logging.getLogger(__name__)
-        level = logging.DEBUG if verbose else logging.INFO
-        logging.basicConfig(
-            level=level, format="%(asctime)s %(levelname)s: %(message)s"
+        self.default_timezone = self._validate_timezone(default_timezone)
+        self.default_device_type = validate_device_type(device_type)
+        self.config = self._build_config(
+            config=config,
+            api_key=api_key,
+            login_id=login_id,
+            login_pass=login_pass,
+            base_serial=base_serial,
         )
 
-        # 自動保存設定
-        self._auto_save_config = auto_save_config
-        # どのパスに保存するか — 明示的に文字列パスが渡された場合はそれを尊重
-        if isinstance(config, str):
-            self._config_path = config
+        if auto_save_config:
+            warnings.warn(
+                "auto_save_config は廃止されました．設定は自動保存されません．",
+                FutureWarning,
+                stacklevel=2,
+            )
+        if config_path is not None:
+            warnings.warn(
+                "config_path は自動保存の廃止に伴い使用されません．",
+                FutureWarning,
+                stacklevel=2,
+            )
+
+        if transport is not None and session is not None:
+            raise ValueError("transport と session は同時に指定できません")
+
+        if transport is None:
+            self._transport = HTTPTransport(
+                timeout=timeout,
+                retry_policy=RetryPolicy(max_attempts=retries),
+                session=session,
+                logger_=self.logger,
+            )
+            self._owns_transport = True
         else:
-            self._config_path = config_path
+            self._transport = transport
+            self._owns_transport = False
 
-        # config が dict/None から生成された場合、自動で保存
-        if self._auto_save_config and (cfg is None or not isinstance(config, str)):
-            # 既にファイルが存在する場合は上書きしない（後続で _save_config 呼び出し時に更新）
-            if not os.path.exists(self._config_path):
-                try:
-                    self._save_config()
-                except Exception as e:
-                    self.logger.warning(
-                        "Failed to auto-create config file %s: %s",
-                        self._config_path,
-                        e,
-                    )
+        self._closed = False
 
-    def _resolve_base(self, remote_key: str) -> Optional[str]:
-        # リモートキーからベースシリアルを取得
-        info = self._remote_map.get(remote_key, {})
-        base_name = info.get("base", "")
-        base_info = self._bases.get(base_name)
-        if not base_info:
-            # raise KeyError(f"Base '{base_name}' が設定にありません")
-            return info.get("serial")
-        return base_info["serial"]
+    @classmethod
+    def from_file(
+        cls,
+        path: str | os.PathLike[str],
+        **kwargs: Any,
+    ) -> OndotoriClient:
+        return cls(config=ClientConfig.from_file(path), **kwargs)
 
-    def _to_timestamp(self, dt: Union[datetime, int, str]) -> int:
-        if isinstance(dt, int):
-            return dt
-        if isinstance(dt, datetime):
-            return int(dt.timestamp())
-        return int(datetime.fromisoformat(dt).timestamp())
+    @classmethod
+    def from_mapping(
+        cls,
+        data: Mapping[str, Any],
+        **kwargs: Any,
+    ) -> OndotoriClient:
+        return cls(config=ClientConfig.from_mapping(data), **kwargs)
 
-    def _post(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        for attempt in range(self.retries):
-            self.logger.debug(
-                "POST %s attempt=%s payload_len=%s",
-                url,
-                attempt + 1,
-                len(str(payload)),
+    @classmethod
+    def from_credentials(
+        cls,
+        *,
+        api_key: str,
+        login_id: str,
+        login_pass: str,
+        base_serial: str | None = None,
+        **kwargs: Any,
+    ) -> OndotoriClient:
+        return cls(
+            config=ClientConfig.from_credentials(
+                api_key=api_key,
+                login_id=login_id,
+                login_pass=login_pass,
+                base_serial=base_serial,
+            ),
+            **kwargs,
+        )
+
+    @staticmethod
+    def _validate_timezone(value: tzinfo) -> tzinfo:
+        if not isinstance(value, tzinfo):
+            raise TypeError("default_timezone には tzinfo を指定してください")
+        try:
+            offset = datetime.now(value).utcoffset()
+        except Exception as exc:
+            raise ValueError("default_timezone が不正です") from exc
+        if offset is None:
+            raise ValueError("default_timezone が不正です")
+        return value
+
+    @staticmethod
+    def _build_config(
+        *,
+        config: (
+            ClientConfig
+            | str
+            | os.PathLike[str]
+            | Mapping[str, Any]
+            | None
+        ),
+        api_key: str | None,
+        login_id: str | None,
+        login_pass: str | None,
+        base_serial: str | None,
+    ) -> ClientConfig:
+        direct_values = (api_key, login_id, login_pass, base_serial)
+
+        if config is not None and any(v is not None for v in direct_values):
+            raise ConfigurationError(
+                "config と直接認証情報は同時に指定できません"
             )
-            resp = self.session.post(
-                url, headers=self.headers, json=payload, timeout=self.timeout
+        if isinstance(config, ClientConfig):
+            return config
+        if isinstance(config, (str, os.PathLike)):
+            return ClientConfig.from_file(config)
+        if isinstance(config, Mapping):
+            return ClientConfig.from_mapping(config)
+        if config is not None:
+            raise TypeError(
+                "config には ClientConfig，パス，Mapping，または None を"
+                "指定してください"
             )
+
+        missing = [
+            name
+            for name, value in (
+                ("api_key", api_key),
+                ("login_id", login_id),
+                ("login_pass", login_pass),
+            )
+            if value is None
+        ]
+        if missing:
+            raise ConfigurationError(
+                "認証情報が不足しています: " + ", ".join(missing)
+            )
+
+        return ClientConfig.from_credentials(
+            api_key=api_key,
+            login_id=login_id,
+            login_pass=login_pass,
+            base_serial=base_serial,
+        )
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise RuntimeError("OndotoriClient は既に閉じられています")
+
+    def _auth_payload(self) -> dict[str, str]:
+        return self.config.credentials.to_api_payload()
+
+    def _resolve_remote_identity(
+        self,
+        remote_key: str,
+        device_type: DeviceType | None = None,
+    ) -> tuple[str, DeviceType, str | None]:
+        if not isinstance(remote_key, str) or not remote_key.strip():
+            raise RequestValidationError(
+                "remote_key には空でない文字列を指定してください"
+            )
+
+        key = remote_key.strip()
+        configured = self.config.remotes.get(key)
+
+        if configured is None:
+            serial = key
+            resolved_type = (
+                validate_device_type(device_type)
+                if device_type is not None
+                else self.default_device_type
+            )
+            base_name = self.config.default_rtr500_base
+        else:
+            serial = configured.serial
+            resolved_type = (
+                validate_device_type(device_type)
+                if device_type is not None
+                else configured.device_type
+            )
+            base_name = configured.base or self.config.default_rtr500_base
+
+        return serial, resolved_type, base_name
+
+    def _resolve_remote(
+        self,
+        remote_key: str,
+        device_type: DeviceType | None = None,
+    ) -> ResolvedRemote:
+        serial, resolved_type, base_name = self._resolve_remote_identity(
+            remote_key,
+            device_type,
+        )
+
+        if resolved_type == "default":
+            return ResolvedRemote(
+                key=remote_key,
+                serial=serial,
+                device_type="default",
+            )
+
+        if base_name is None:
+            raise ConfigurationError(
+                f"RTR500 機器 {remote_key!r} に親機が設定されていません"
+            )
+        try:
+            base_serial = self.config.bases[base_name].serial
+        except KeyError as exc:
+            raise ConfigurationError(
+                f"親機 {base_name!r} が bases に定義されていません"
+            ) from exc
+
+        return ResolvedRemote(
+            key=remote_key,
+            serial=serial,
+            device_type="rtr500",
+            base_serial=base_serial,
+        )
+
+    def _to_timestamp(
+        self,
+        value: DateTimeInput,
+        *,
+        field_name: str,
+    ) -> int:
+        if isinstance(value, bool):
+            raise RequestValidationError(
+                f"{field_name} に bool は指定できません"
+            )
+        if isinstance(value, (int, float)):
             try:
-                resp.raise_for_status()
-                return resp.json()
-            except Exception as e:
-                self.logger.warning("Error %s on attempt %s", e, attempt + 1)
-                if attempt == self.retries - 1:
-                    raise
-        # ここには到達しない想定だが、型チェック回避のため例外を送出
-        raise RuntimeError("_post: Unexpected exit without response")
+                return int(value)
+            except (OverflowError, ValueError) as exc:
+                raise RequestValidationError(
+                    f"{field_name} を Unix time に変換できません"
+                ) from exc
 
-    def get_current(self, remote_key: str) -> Dict[str, Any]:
-        """現在値取得"""
-        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
-        payload = {**self._auth, "remote-serial": [serial]}
-        # デバイスタイプ決定
-        device_type_a = self._remote_map.get(remote_key, {}).get(
-            "type", self.device_type
+        if isinstance(value, datetime):
+            parsed = value
+        elif isinstance(value, str):
+            normalized = value.strip()
+            if not normalized:
+                raise RequestValidationError(
+                    f"{field_name} に空文字列は指定できません"
+                )
+            try:
+                return int(float(normalized))
+            except ValueError:
+                pass
+            if normalized.endswith("Z"):
+                normalized = normalized[:-1] + "+00:00"
+            try:
+                parsed = datetime.fromisoformat(normalized)
+            except ValueError as exc:
+                raise RequestValidationError(
+                    f"{field_name} を日時として解釈できません: {value!r}"
+                ) from exc
+        else:
+            raise RequestValidationError(
+                f"{field_name} には datetime，Unix time，または "
+                "ISO 8601 文字列を指定してください"
+            )
+
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            parsed = parsed.replace(tzinfo=self.default_timezone)
+
+        try:
+            return int(parsed.timestamp())
+        except (OverflowError, OSError, ValueError) as exc:
+            raise RequestValidationError(
+                f"{field_name} を Unix time に変換できません"
+            ) from exc
+
+    def _build_time_range(
+        self,
+        *,
+        dt_from: DateTimeInput | None,
+        dt_to: DateTimeInput | None,
+        hours: float | None,
+    ) -> TimeRange:
+        if hours is not None and (dt_from is not None or dt_to is not None):
+            raise RequestValidationError(
+                "hours と dt_from/dt_to は同時に指定できません"
+            )
+
+        if hours is not None:
+            if isinstance(hours, bool):
+                raise RequestValidationError(
+                    "hours には正の数値を指定してください"
+                )
+            try:
+                normalized_hours = float(hours)
+            except (TypeError, ValueError) as exc:
+                raise RequestValidationError(
+                    "hours には正の数値を指定してください"
+                ) from exc
+            if normalized_hours <= 0:
+                raise RequestValidationError(
+                    "hours は正の値である必要があります"
+                )
+
+            end = int(datetime.now(UTC).timestamp())
+            return TimeRange(
+                start=int(end - normalized_hours * 3600),
+                end=end,
+            )
+
+        start = (
+            self._to_timestamp(dt_from, field_name="dt_from")
+            if dt_from is not None
+            else None
         )
-        # remote_map へ登録 (base は不要)
-        self._update_remote_map(remote_key, serial, device_type_a)
-        return self._post(self._URL_CURRENT, payload)
+        end = (
+            self._to_timestamp(dt_to, field_name="dt_to")
+            if dt_to is not None
+            else None
+        )
+        return TimeRange(start=start, end=end)
+
+    @staticmethod
+    def _validate_count(count: int | None) -> int | None:
+        if count is None:
+            return None
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise RequestValidationError(
+                "count には正の整数を指定してください"
+            )
+        if count <= 0:
+            raise RequestValidationError(
+                "count は正の値である必要があります"
+            )
+        return count
+
+    def _post(
+        self,
+        url: str,
+        payload: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        self._ensure_open()
+        return self._transport.post_json(
+            url,
+            payload,
+            headers=self._HEADERS,
+        )
+
+    def get_current(
+        self,
+        remote_key: str,
+        *,
+        device_type: DeviceType | None = None,
+    ) -> dict[str, Any]:
+        serial, _, _ = self._resolve_remote_identity(
+            remote_key,
+            device_type,
+        )
+        return self._post(
+            self._URL_CURRENT,
+            {
+                **self._auth_payload(),
+                "remote-serial": [serial],
+            },
+        )
+
+    @overload
+    def get_data(
+        self,
+        remote_key: str,
+        dt_from: DateTimeInput | None = None,
+        dt_to: DateTimeInput | None = None,
+        count: int | None = None,
+        hours: float | None = None,
+        as_df: Literal[False] = False,
+        device_type: DeviceType | None = None,
+    ) -> dict[str, Any]: ...
+
+    @overload
+    def get_data(
+        self,
+        remote_key: str,
+        dt_from: DateTimeInput | None = None,
+        dt_to: DateTimeInput | None = None,
+        count: int | None = None,
+        hours: float | None = None,
+        as_df: Literal[True] = True,
+        device_type: DeviceType | None = None,
+    ) -> pd.DataFrame: ...
 
     def get_data(
         self,
         remote_key: str,
-        dt_from: Optional[Union[datetime, int, str]] = None,
-        dt_to: Optional[Union[datetime, int, str]] = None,
-        count: Optional[int] = None,
-        hours: Optional[int] = None,
+        dt_from: DateTimeInput | None = None,
+        dt_to: DateTimeInput | None = None,
+        count: int | None = None,
+        hours: float | None = None,
         as_df: bool = False,
-        device_type: Optional[str] = None,
-    ) -> Union[Dict[str, Any], pd.DataFrame]:
-        """期間/件数指定データ取得"""
-        # 時間レンジ計算
-        if hours is not None:
-            now = int(datetime.now().timestamp())
-            dt_to_unix = now
-            dt_from_unix = now - hours * 3600
-        else:
-            dt_from_unix = self._to_timestamp(dt_from) if dt_from else None
-            dt_to_unix = self._to_timestamp(dt_to) if dt_to else None
+        device_type: DeviceType | None = None,
+    ) -> dict[str, Any] | pd.DataFrame:
+        remote = self._resolve_remote(remote_key, device_type)
+        time_range = self._build_time_range(
+            dt_from=dt_from,
+            dt_to=dt_to,
+            hours=hours,
+        )
+        count = self._validate_count(count)
 
-        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
-        payload = {**self._auth, "remote-serial": serial}
-        if device_type is not None:
-            device_type_a = device_type
-        elif self._remote_map.get(remote_key, {}).get("type") is not None:
-            device_type_a = self._remote_map[remote_key]["type"]
-        else:
-            device_type_a = self.device_type
-        if device_type_a == "rtr500":
+        payload: dict[str, Any] = {
+            **self._auth_payload(),
+            "remote-serial": remote.serial,
+            **time_range.to_payload(),
+        }
+
+        if remote.is_rtr500:
+            if count is not None:
+                raise RequestValidationError(
+                    "count は rtr500 データ取得では使用できません"
+                )
             url = self._URL_DATA_RTR500
-            payload["base-serial"] = self._resolve_base(remote_key)
+            payload["base-serial"] = remote.base_serial
         else:
             url = self._URL_DATA_DEFAULT
             if count is not None:
                 payload["number"] = count
 
-        # remote_map 更新
-        if device_type_a == "rtr500":
-            base_serial_for_map = self._resolve_base(remote_key)
-        else:
-            base_serial_for_map = None
-        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
-
-        if dt_from_unix is not None:
-            payload["unixtime-from"] = dt_from_unix
-        if dt_to_unix is not None:
-            payload["unixtime-to"] = dt_to_unix
-
         result = self._post(url, payload)
         if as_df:
-            # DataFrame 出力時にのみインポート
-            try:
-                import pandas as pd
-            except ImportError:
-                msg = (
-                    "pandas がインストールされていないため DataFrame 出力できません。 "
-                    "`pip install ondotori-client[dataframe]` をお試しください。"
-                )
-                raise ImportError(msg)
-            times, temps, hums = parse_data(result)
-            return pd.DataFrame({"timestamp": times, "temp_C": temps, "hum_%": hums})
+            return self._to_temperature_humidity_dataframe(result)
         return result
 
-    def get_latest_data(
-        self, remote_key: str, device_type: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """最新データ取得"""
-        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
-        payload = {**self._auth, "remote-serial": serial}
-        if device_type is not None:
-            device_type_a = device_type
-        elif self._remote_map.get(remote_key, {}).get("type") is not None:
-            device_type_a = self._remote_map[remote_key]["type"]
-        else:
-            device_type_a = self.device_type
-        if device_type_a == "rtr500":
-            url = self._URL_LATEST_RTR500
-            payload["base-serial"] = self._resolve_base(remote_key)
-        else:
-            url = self._URL_LATEST_DEFAULT
-        # remote_map 更新
-        if device_type_a == "rtr500":
-            base_serial_for_map = self._resolve_base(remote_key)
-        else:
-            base_serial_for_map = None
-        self._update_remote_map(remote_key, serial, device_type_a, base_serial_for_map)
-        return self._post(url, payload)
-
-    def get_alerts(self, remote_key: str) -> Dict[str, Any]:
-        """アラートログ取得"""
-        serial = self._remote_map.get(remote_key, {}).get("serial", remote_key)
-        payload = {**self._auth, "remote-serial": serial}
-        payload["base-serial"] = self._resolve_base(remote_key)
-        # remote_map 更新（RTR500 前提）
-        self._update_remote_map(remote_key, serial, "rtr500", payload["base-serial"])
-        return self._post(self._URL_ALERT, payload)
-
-    # ------------------------------------------------------------------
-    # プライベート: 設定ファイル保存／更新処理
-    # ------------------------------------------------------------------
-
-    def _save_config(self) -> None:
-        """現在の設定を JSON で保存 (indent=2, UTF-8)"""
-        if not self._auto_save_config:
-            return
-        cfg_out = {
-            "api_key": self._auth.get("api-key"),
-            "login_id": self._auth.get("login-id"),
-            "login_pass": self._auth.get("login-pass"),
-            "default_rtr500_base": self._default_base,
-            "bases": self._bases,
-            "remote_map": self._remote_map,
-        }
-        try:
-            with open(self._config_path, "w", encoding="utf-8") as f:
-                json.dump(cfg_out, f, ensure_ascii=False, indent=2)
-            self.logger.debug("Config saved to %s", self._config_path)
-        except Exception as e:
-            self.logger.warning("Failed to save config to %s: %s", self._config_path, e)
-
-    def _update_remote_map(
+    def get_data_raw(
         self,
         remote_key: str,
-        serial: str,
-        device_type: str,
-        base_serial: Optional[str] = None,
-    ) -> None:
-        """remote_map に情報を追加し、必要なら設定を保存"""
-        if not self._auto_save_config:
+        dt_from: DateTimeInput | None = None,
+        dt_to: DateTimeInput | None = None,
+        count: int | None = None,
+        hours: float | None = None,
+        device_type: DeviceType | None = None,
+    ) -> dict[str, Any]:
+        return self.get_data(
+            remote_key,
+            dt_from=dt_from,
+            dt_to=dt_to,
+            count=count,
+            hours=hours,
+            as_df=False,
+            device_type=device_type,
+        )
+
+    def get_data_records(
+        self,
+        remote_key: str,
+        dt_from: DateTimeInput | None = None,
+        dt_to: DateTimeInput | None = None,
+        count: int | None = None,
+        hours: float | None = None,
+        device_type: DeviceType | None = None,
+    ) -> list[MeasurementRecord]:
+        raw = self.get_data_raw(
+            remote_key,
+            dt_from=dt_from,
+            dt_to=dt_to,
+            count=count,
+            hours=hours,
+            device_type=device_type,
+        )
+        return parse_data_records(raw, tz=self.default_timezone)
+
+    def get_data_frame(
+        self,
+        remote_key: str,
+        dt_from: DateTimeInput | None = None,
+        dt_to: DateTimeInput | None = None,
+        count: int | None = None,
+        hours: float | None = None,
+        device_type: DeviceType | None = None,
+    ) -> pd.DataFrame:
+        raw = self.get_data_raw(
+            remote_key,
+            dt_from=dt_from,
+            dt_to=dt_to,
+            count=count,
+            hours=hours,
+            device_type=device_type,
+        )
+        return self._to_temperature_humidity_dataframe(raw)
+
+    def _to_temperature_humidity_dataframe(
+        self,
+        raw: Mapping[str, Any],
+    ) -> pd.DataFrame:
+        try:
+            import pandas as pd
+        except ImportError as exc:
+            raise ImportError(
+                "pandas が必要です．"
+                "`pip install ondotori-client[dataframe]` を実行してください"
+            ) from exc
+
+        readings = parse_temperature_humidity_data(
+            raw,
+            tz=self.default_timezone,
+        )
+        return pd.DataFrame(
+            {
+                "timestamp": [r.timestamp for r in readings],
+                "temp_C": [r.temperature_c for r in readings],
+                "hum_%": [r.humidity_percent for r in readings],
+            }
+        )
+
+    def get_latest_data(
+        self,
+        remote_key: str,
+        device_type: DeviceType | None = None,
+    ) -> dict[str, Any]:
+        remote = self._resolve_remote(remote_key, device_type)
+        payload: dict[str, Any] = {
+            **self._auth_payload(),
+            "remote-serial": remote.serial,
+        }
+
+        if remote.is_rtr500:
+            url = self._URL_LATEST_RTR500
+            payload["base-serial"] = remote.base_serial
+        else:
+            url = self._URL_LATEST_DEFAULT
+
+        return self._post(url, payload)
+
+    def get_latest_records(
+        self,
+        remote_key: str,
+        device_type: DeviceType | None = None,
+    ) -> list[MeasurementRecord]:
+        raw = self.get_latest_data(
+            remote_key,
+            device_type=device_type,
+        )
+        return parse_data_records(raw, tz=self.default_timezone)
+
+    def get_alerts(self, remote_key: str) -> dict[str, Any]:
+        remote = self._resolve_remote(
+            remote_key,
+            device_type="rtr500",
+        )
+        return self._post(
+            self._URL_ALERT,
+            {
+                **self._auth_payload(),
+                "remote-serial": remote.serial,
+                "base-serial": remote.base_serial,
+            },
+        )
+
+    def close(self) -> None:
+        if self._closed:
             return
-        if remote_key in self._remote_map:
-            return  # 既に登録済み
-        info: Dict[str, Any] = {"serial": serial}
-        if device_type:
-            info["type"] = device_type
-        if device_type == "rtr500" and base_serial:
-            # base 名は default_rtr500_base を使用
-            info["base"] = self._default_base
-        self._remote_map[remote_key] = info
-        # 保存
-        self._save_config()
+        if self._owns_transport:
+            self._transport.close()
+        self._closed = True
+
+    def __enter__(self) -> OndotoriClient:
+        self._ensure_open()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
+
+
+__all__ = ["DateTimeInput", "OndotoriClient"]
