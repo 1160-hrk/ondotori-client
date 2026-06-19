@@ -1,4 +1,1 @@
-ipykernel
-pytest
-pylint
-# （必要に応じて black, isort, mypy など）
+-e .[dev,dataframe]
