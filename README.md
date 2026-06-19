@@ -4,115 +4,235 @@
 [![PyPI version](https://img.shields.io/pypi/v/ondotori-client.svg)](https://pypi.org/project/ondotori-client/)
 [![License](https://img.shields.io/github/license/1160-hrk/ondotori-client.svg)](https://github.com/1160-hrk/ondotori-client/blob/main/LICENSE)
 
-## 概要
+Ondotori WebStorage API を Python から利用するためのクライアントライブラリです．通常機器用エンドポイントと RTR500B 系列用エンドポイントの両方を扱えます．
 
-Ondotori WebStorage API（RTR500B／その他機種）を Python から簡単に操作するクライアントライブラリです。
-本ライブラリは、[おんどとり WebStorage API](https://ondotori.webstorage.jp/docs/api/index.html) でデータ取得が可能な全ての機種に対応しています。
-
-## Quickstart
-
-1. Ondotori Web Storage のアカウントを作成し、使用する機器の設定を行ってください。
-
-2. [公式ページ](https://ondotori.webstorage.jp/docs/api/authentication/auth_apikey.html) を参照して、APIキーを取得してください。
-
-3. 本ライブラリをインストールします。
-   以下のいずれかの方法でインストールできます：
-
-   * `pip install ondotori-client`
-   * または、`src/ondotori_client` ディレクトリを直接ダウンロードして使用します。
-
-4. 下記の [`config.json` 設定ファイル](https://github.com/1160-hrk/ondotori-client?tab=readme-ov-file#configjson-%E8%A8%AD%E5%AE%9A%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB) を参照して、プロジェクトのルートディレクトリに適当な名前（例：`config.json`）で保存してください。
-   このファイルは、`OndotoriClient` のインスタンスを作成する際に必要となります。
-
-5. 次節に記載されている「典型的な使い方」を参照し、Ondotori のデータを取得してください。
+API 応答の生 JSON はそのまま取得できます．`parse_current()`，`parse_data()`，`get_data_frame()` は，`ch1` を温度，`ch2` を湿度として扱う温湿度機器向けの補助機能です．
 
 ## インストール
 
 ```bash
 pip install ondotori-client
-````
+```
 
-## 典型的な使い方
+DataFrame 出力も使用する場合は，次を実行します．
+
+```bash
+pip install "ondotori-client[dataframe]"
+```
+
+開発用環境では，リポジトリのルートで次を実行します．
+
+```bash
+pip install -e ".[dev,dataframe]"
+```
+
+## Quickstart
+
+```python
+from zoneinfo import ZoneInfo
+
+from ondotori_client import OndotoriClient, parse_current, parse_data
+
+
+with OndotoriClient.from_file(
+    "configs/config.json",
+    default_timezone=ZoneInfo("Asia/Tokyo"),
+) as client:
+    current_raw = client.get_current("room_default")
+    timestamp, temperature, humidity = parse_current(
+        current_raw,
+        tz=ZoneInfo("Asia/Tokyo"),
+    )
+    print(timestamp, temperature, humidity)
+
+    data_raw = client.get_data(
+        "room_default",
+        dt_from="2026-06-01T00:00:00+09:00",
+        dt_to="2026-06-02T00:00:00+09:00",
+    )
+    times, temperatures, humidities = parse_data(
+        data_raw,
+        tz=ZoneInfo("Asia/Tokyo"),
+    )
+
+    frame = client.get_data_frame("room_default", hours=1)
+    print(frame.tail())
+```
+
+パッケージ直下から主要なクラスと関数を import できます．旧形式の次の import も維持しています．
 
 ```python
 from ondotori_client.client import OndotoriClient, parse_current, parse_data
-import pandas as pd
-
-# — 設定ファイルを使う場合 —
-client = OndotoriClient(config="config.json", verbose=True)
-
-# — 1. 現在値取得 —
-data_cur = client.get_current("<remote_serial_key>")
-ts, temp, hum = parse_current(data_cur)
-print(f"現在値: {ts} — {temp}℃ / {hum}%")
-
-# — 2. 過去指定期間のログ取得 —
-res = client.get_data("<remote_serial_key>", dt_from="2025-05-01T00:00:00", dt_to="2025-05-02T00:00:00")
-times, temps, hums = parse_data(res)
-df = pd.DataFrame({"time": times, "temp": temps, "hum": hums})
-print(df.head())
-
-# — 3. 直近300件ログ(または hours=1)を DataFrame で —
-df_latest = client.get_data("<remote_serial_key>", hours=1, as_df=True)
-print(df_latest.tail())
-
-# — 4. アラートログ取得 —
-alerts = client.get_alerts("<remote_serial_key>")
-print(alerts)
-
 ```
 
-## `config.json` 設定ファイル
+## 設定ファイル
 
-`config.json` は、Web Storage APIの設定を定義するファイルです。このファイルには、APIの認証情報、基本情報、接続するセンサーの設定などが含まれています。以下に、`config.json` の構造と各項目の説明を示します。
+`configs/config.example.json` をコピーし，実際の認証情報を入力して `configs/config.json` を作成します．
 
-### 設定例 (`configs/config.example.json`)
+```bash
+cp configs/config.example.json configs/config.json
+```
 
 ```json
 {
-    "api_key": "<YOUR_API_KEY>",
-    "login_id": "<YOUR_LOGIN_ID>",
-    "login_pass": "<YOUR_LOGIN_PASSWORD>",
-  
-    "default_rtr500_base": "name_base1",
-  
-    "bases": {
-      "name_base1": {
-        "serial": "<YOUR_BASE_SERIAL_FOR_BASE1>"
-      }
-    },
-  
-    "remote_map": {
-      "name1_rtr500":   { "serial": "name1_rtr500",  "type": "rtr500",  "base": "BASE1" },
-      "name2_rtr500":   { "serial": "name2_rtr500",  "type": "rtr500",  "base": "BASE1" },
-      "name3_rtr500":   { "serial": "name3_rtr500",  "type": "rtr500",  "base": "BASE1" },
-  
-      "name1_default":  { "serial": "name1_default", "type": "default" },
-      "name2_default":  { "serial": "name2_default", "type": "default" }
+  "api_key": "<YOUR_API_KEY>",
+  "login_id": "<YOUR_LOGIN_ID>",
+  "login_pass": "<YOUR_LOGIN_PASSWORD>",
+  "default_rtr500_base": "base1",
+  "bases": {
+    "base1": {
+      "serial": "<YOUR_BASE_SERIAL>"
     }
+  },
+  "remote_map": {
+    "room_rtr500": {
+      "serial": "<YOUR_RTR500_REMOTE_SERIAL>",
+      "type": "rtr500",
+      "base": "base1"
+    },
+    "room_default": {
+      "serial": "<YOUR_DEFAULT_DEVICE_SERIAL>",
+      "type": "default"
+    }
+  }
 }
 ```
 
-### 各項目の説明
+各項目の意味は次のとおりです．
 
-* **`api_key`**: 必須のAPIキー。サービスにアクセスするために使用されます。（[公式ページ](https://ondotori.webstorage.jp/docs/api/authentication/auth_apikey.html)をご参照ください。）
+- `api_key`：WebStorage API キー．
+- `login_id`，`login_pass`：WebStorage の認証情報．
+- `bases`：RTR500B 親機の名前とシリアル番号の対応．
+- `default_rtr500_base`：子機側で `base` を省略した場合に使う親機名．
+- `remote_map`：任意の機器名と実シリアル番号の対応．
+- `remote_map.*.type`：`default` または `rtr500`．
+- `remote_map.*.base`：`bases` に定義した親機名．RTR500 の場合のみ指定できます．
 
-* **`login_id`** と **`login_pass`**: Ondotori Web StrageのユーザーのログインIDとパスワード。これらを使用して、サービスにログインします。
+`configs/config.json` には API キーとパスワードが入るため，`.gitignore` で Git 管理から除外しています．`configs/config.example.json` には実データを入力しないでください．
 
-* **`default_rtr500_base`**: デフォルトで使用するベースの名前。（RTR500Bを使用する時のみ必要）
+## 主な API
 
-* **`bases`**: 使用するベースの設定。ここでは、`name_base1` のような名前のベースと、そのシリアル番号を指定します。（RTR500Bを使用する時のみ必要）
+### 生 JSON を取得する
 
-* **`remote_map`**: 各センサーとその設定をマッピングするための部分です。`name1_rtr500` のようなセンサー名に対して、シリアル番号、タイプ、ベースを設定します。
-  * ```key```: センサーの名前（自由に設定して構いません。```OndotoriClient```のインスタンスメソッドの引数に使います。）
-  * ```serial```: シリアル番号（OndotoriのWeb Strageの[機器設定](https://ondotori.webstorage.jp/device/)にて確認できます。）
-  * ```base```: RTR500Bを使用する時のみその親機の名前を設定します。（上記で設定した```bases```の中から選んでください。指定しないと```default_rtr500_base```で設定したものが使用されます。）
+```python
+current = client.get_current("room_default")
+logs = client.get_data("room_default", hours=24)
+latest = client.get_latest_data("room_default")
+alerts = client.get_alerts("room_rtr500")
+```
 
-### 使用方法
+`remote_map` にない文字列を渡した場合は，その文字列をシリアル番号として扱います．RTR500 として直接指定する場合は，親機設定も必要です．
 
-1. [**`configs/config.example.json`**](configs/config.example.json) をコピーして、`config.json` ファイルを作成します。
-2. 必要な設定（APIキー、ログイン情報、ベースやセンサー情報）を **`config.json`** に記入します。
-3. `config.json` をプロジェクトのルートディレクトリに配置してください。
+```python
+logs = client.get_data(
+    "DIRECT_REMOTE_SERIAL",
+    hours=1,
+    device_type="rtr500",
+)
+```
+
+### 型付きレコードを取得する
+
+```python
+record = client.get_current_record("room_default")
+records = client.get_data_records("room_default", hours=1)
+
+print(record.timestamp)
+print(record.require_channel("ch1").numeric_value)
+```
+
+### 温湿度モデルを取得する
+
+```python
+reading = client.get_current_temperature_humidity("room_default")
+print(reading.temperature_c)
+print(reading.humidity_percent)
+```
+
+### DataFrame を取得する
+
+```python
+frame = client.get_data_frame("room_default", hours=1)
+```
+
+列は `timestamp`，`temp_C`，`hum_%` です．この機能は `ch1 = 温度`，`ch2 = 湿度` を仮定します．
+
+## 日時の扱い
+
+Unix time は内部でタイムゾーン付き `datetime` に変換します．デフォルトのタイムゾーンは UTC です．日本時間を使う場合は，クライアントまたはパーサーに明示的に指定してください．
+
+```python
+from zoneinfo import ZoneInfo
+
+client = OndotoriClient.from_file(
+    "configs/config.json",
+    default_timezone=ZoneInfo("Asia/Tokyo"),
+)
+```
+
+タイムゾーンを含まない ISO 8601 文字列を `get_data()` に渡した場合は，`default_timezone` の時刻として解釈します．再現性のため，通常は `+09:00` などを明示することを推奨します．
+
+## 例外処理
+
+```python
+from ondotori_client import (
+    AuthenticationError,
+    ConfigurationError,
+    OndotoriError,
+    TransportError,
+)
+
+try:
+    data = client.get_data("room_default", hours=1)
+except AuthenticationError:
+    print("認証情報を確認してください")
+except ConfigurationError:
+    print("config.json を確認してください")
+except TransportError:
+    print("ネットワーク接続を確認してください")
+except OndotoriError as error:
+    print(error)
+```
+
+## 設定の保存
+
+クライアントは設定を自動保存しません．保存する場合だけ明示的に呼び出します．保存ファイルには認証情報が含まれます．
+
+```python
+client.save_config("configs/config.json", overwrite=True)
+```
+
+## テスト
+
+通常の単体テストでは実 API を呼び出しません．
+
+```bash
+pytest -m "not integration"
+```
+
+手元の `configs/config.json` を使って実 API を確認する場合は，明示的に integration test を有効にします．
+
+```bash
+ONDOTORI_RUN_INTEGRATION=1 pytest -m integration
+```
+
+特定の機器を使う場合は，`remote_map` のキーまたはシリアル番号を指定できます．
+
+```bash
+ONDOTORI_RUN_INTEGRATION=1 \
+ONDOTORI_REMOTE_KEY=room_default \
+pytest -m integration
+```
+
+CI では integration test を実行しないため，GitHub Actions に実際の認証情報を登録する必要はありません．
+
+## 開発時の確認
+
+```bash
+ruff check .
+pytest -m "not integration" --cov=ondotori_client
+python -m build
+```
 
 ## License
 

@@ -4,16 +4,29 @@ import logging
 import os
 import warnings
 from collections.abc import Mapping
-from datetime import UTC, datetime, tzinfo
+from datetime import datetime, timezone, tzinfo
+from pathlib import Path
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, overload
 
 import requests
 
 from .config import ClientConfig, DeviceType, validate_device_type
 from .exceptions import ConfigurationError, RequestValidationError
-from .models import MeasurementRecord, ResolvedRemote, TimeRange
-from .parsers import parse_data_records, parse_temperature_humidity_data
+from .models import (
+    MeasurementRecord,
+    ResolvedRemote,
+    TemperatureHumidityReading,
+    TimeRange,
+)
+from .parsers import (
+    parse_current,
+    parse_current_record,
+    parse_current_temperature_humidity,
+    parse_data,
+    parse_data_records,
+    parse_temperature_humidity_data,
+)
 from .transport import HTTPTransport, RetryPolicy, Timeout
 
 if TYPE_CHECKING:
@@ -36,7 +49,7 @@ class OndotoriClient:
     )
     _URL_ALERT = "https://api.webstorage.jp/v1/devices/alert"
 
-    _HEADERS = {
+    _HEADERS: ClassVar[dict[str, str]] = {
         "Content-Type": "application/json",
         "X-HTTP-Method-Override": "GET",
     }
@@ -61,7 +74,7 @@ class OndotoriClient:
         session: requests.Session | None = None,
         logger: logging.Logger | None = None,
         transport: HTTPTransport | None = None,
-        default_timezone: tzinfo = UTC,
+        default_timezone: tzinfo = timezone.utc,
         auto_save_config: bool | None = None,
         config_path: str | os.PathLike[str] | None = None,
     ) -> None:
@@ -107,7 +120,7 @@ class OndotoriClient:
                 timeout=timeout,
                 retry_policy=RetryPolicy(max_attempts=retries),
                 session=session,
-                logger_=self.logger,
+                logger=self.logger,
             )
             self._owns_transport = True
         else:
@@ -115,6 +128,26 @@ class OndotoriClient:
             self._owns_transport = False
 
         self._closed = False
+
+
+    @property
+    def session(self) -> requests.Session:
+        """互換性のため，内部 transport の Session を返す．"""
+        return self._transport.session
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """API リクエストで使用するヘッダーのコピーを返す．"""
+        return dict(self._HEADERS)
+
+    def save_config(
+        self,
+        path: str | os.PathLike[str],
+        *,
+        overwrite: bool = False,
+    ) -> Path:
+        """現在の設定を明示的に保存する．認証情報を含むため取扱注意．"""
+        return self.config.save(path, overwrite=overwrite)
 
     @classmethod
     def from_file(
@@ -211,6 +244,9 @@ class OndotoriClient:
                 "認証情報が不足しています: " + ", ".join(missing)
             )
 
+        assert api_key is not None
+        assert login_id is not None
+        assert login_pass is not None
         return ClientConfig.from_credentials(
             api_key=api_key,
             login_id=login_id,
@@ -374,10 +410,10 @@ class OndotoriClient:
                     "hours は正の値である必要があります"
                 )
 
-            end = int(datetime.now(UTC).timestamp())
+            current_end = int(datetime.now(timezone.utc).timestamp())
             return TimeRange(
-                start=int(end - normalized_hours * 3600),
-                end=end,
+                start=int(current_end - normalized_hours * 3600),
+                end=current_end,
             )
 
         start = (
@@ -434,6 +470,30 @@ class OndotoriClient:
                 **self._auth_payload(),
                 "remote-serial": [serial],
             },
+        )
+
+
+    def get_current_record(
+        self,
+        remote_key: str,
+        *,
+        device_type: DeviceType | None = None,
+    ) -> MeasurementRecord:
+        """現在値を汎用 MeasurementRecord として返す．"""
+        raw = self.get_current(remote_key, device_type=device_type)
+        return parse_current_record(raw, tz=self.default_timezone)
+
+    def get_current_temperature_humidity(
+        self,
+        remote_key: str,
+        *,
+        device_type: DeviceType | None = None,
+    ) -> TemperatureHumidityReading:
+        """現在値を温湿度専用モデルとして返す．"""
+        raw = self.get_current(remote_key, device_type=device_type)
+        return parse_current_temperature_humidity(
+            raw,
+            tz=self.default_timezone,
         )
 
     @overload
@@ -646,4 +706,9 @@ class OndotoriClient:
         self.close()
 
 
-__all__ = ["DateTimeInput", "OndotoriClient"]
+__all__ = [
+    "DateTimeInput",
+    "OndotoriClient",
+    "parse_current",
+    "parse_data",
+]
